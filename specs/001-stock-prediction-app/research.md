@@ -143,17 +143,37 @@ PostgreSQL `analysis_cache` 테이블 기반 TTL 캐싱 (10분)
 ## 5. 사용자 인증
 
 ### Decision
-이메일/비밀번호 기반 JWT 인증 (FastAPI)
+**NextAuth.js v5 (Auth.js)** — 프론트엔드에서 Google OAuth 2.0 + Kakao OAuth 2.0 처리. FastAPI는 NextAuth가 발급한 JWT를 PyJWT로 검증 (공유 JWT_SECRET).
 
 ### Rationale
-- 관심 종목 저장, 챗봇 이력, 점수 이력 등 사용자별 데이터가 필요하므로 인증은 필수
-- 초기 단계에서 OAuth2 소셜 로그인은 복잡도 증가 → 이메일/비밀번호 + JWT로 충분
-- `python-jose` + `passlib[bcrypt]`로 토큰 발급·검증
+- 이메일/비밀번호 대신 소셜 로그인을 사용하면 비밀번호 관리·재설정 플로우가 불필요 → 복잡도 감소 (Principle V)
+- NextAuth.js v5는 Next.js 14 App Router와 네이티브 통합. 별도 인증 서버 불필요
+- Google/Kakao는 국내 개인 투자자 타겟 기준 가장 범용적인 OAuth 제공자
+- 프론트엔드가 JWT를 발급하고, 백엔드가 검증만 하는 구조 → FastAPI에서 passlib/bcrypt 제거
+
+### Auth Flow
+```
+1) 사용자 Google/Kakao 버튼 클릭
+2) NextAuth.js → OAuth 플로우 처리 → JWT 발급 (NEXTAUTH_SECRET)
+3) 프론트엔드 → Authorization: Bearer {token} 헤더 첨부
+4) FastAPI → PyJWT.decode(token, JWT_SECRET) → user_id/email/provider 추출
+5) 첫 로그인 시 POST /api/v1/auth/verify → users 테이블 자동 INSERT
+```
+
+### JWT 공유 시크릿 관리
+- `NEXTAUTH_SECRET` (프론트) = `JWT_SECRET` (백엔드) — 동일한 값을 각 환경변수에 설정
+- 32자 이상 랜덤 문자열 사용 (예: `openssl rand -base64 32`)
+
+### Alternatives Considered
+- **이메일/비밀번호 JWT**: 비밀번호 해시·재설정 플로우 추가 복잡도. 소셜 로그인이 이미 결정되어 불필요.
+- **Supabase Auth / Auth0**: 외부 인증 서비스로 추가 비용 발생. 소규모 프로젝트에 과도함.
+- **세션 기반 인증**: Stateless 설계 요구사항과 충돌 (AWS ECS 이관 시 세션 공유 문제).
 
 ### Key Notes
-- 비로그인 사용자도 종목 검색 및 대시보드, AI 분석 기능은 사용 가능 (관심 종목/챗봇 이력만 로그인 필요)
-- JWT는 프론트엔드 `httpOnly` 쿠키 또는 `Authorization: Bearer` 헤더로 전달 — 초기에는 localStorage 방식도 허용하되 보안 강화 시 httpOnly 쿠키로 전환
-- `users` 테이블 추가 필요 (data-model.md 참조)
+- 비로그인 사용자: 종목 검색, 대시보드, AI 분석 사용 가능 (관심 종목/점수 비교는 로그인 필요)
+- Kakao OAuth 설정: [Kakao Developers](https://developers.kakao.com) 앱 등록 필요. 승인된 리다이렉트 URI 설정 필수.
+- `users` 테이블: `hashed_password` 제거, `provider` + `provider_account_id` 추가 (data-model.md 참조)
+- `requirements.txt`: `passlib[bcrypt]` 제거, `PyJWT` 추가
 
 ---
 

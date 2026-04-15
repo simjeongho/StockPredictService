@@ -4,9 +4,9 @@ Auto-generated from all feature plans. Last updated: 2026-04-15
 
 ## Active Technologies
 
-**Backend**: Python 3.11+, FastAPI, Uvicorn, SQLAlchemy[asyncio], asyncpg, Alembic, slowapi, anthropic SDK, yfinance, FinanceDataReader, pandas, pandas_ta, python-jose, passlib[bcrypt], httpx, python-dotenv
+**Backend**: Python 3.11+, FastAPI, Uvicorn, SQLAlchemy[asyncio], asyncpg, Alembic, slowapi, anthropic SDK, yfinance, FinanceDataReader, pandas, pandas_ta, PyJWT, httpx, python-dotenv
 
-**Frontend**: TypeScript, Next.js 14 (App Router), React, Tailwind CSS, Lightweight Charts (TradingView), Axios
+**Frontend**: TypeScript, Next.js 14 (App Router), React, Tailwind CSS, Lightweight Charts (TradingView), Axios, NextAuth.js v5 (Auth.js)
 
 **Storage**: PostgreSQL (Railway → AWS RDS)
 
@@ -24,8 +24,8 @@ backend/
 │   ├── database.py        # async SQLAlchemy engine
 │   ├── models/            # ORM models (watchlist, analysis_cache)
 │   ├── schemas/           # Pydantic schemas
-│   ├── routers/           # API route handlers (stocks, ai, watchlist, scores, health)
-│   └── services/          # Business logic (market_data, indicators, claude, cache, score_parser)
+│   ├── routers/           # API route handlers (stocks, ai, watchlist, scores, auth, health)
+│   └── services/          # Business logic (market_data, indicators, claude, cache, score_parser, auth)
 ├── alembic/               # DB migrations
 ├── tests/
 ├── Dockerfile
@@ -100,7 +100,7 @@ docker run -p 8000:8000 --env-file .env stock-backend
 - **Caching**: 10-minute TTL in `analysis_cache` PostgreSQL table (no Redis needed for ~10 users)
 - **Rate Limiting**: slowapi — 30 req/min global, 5 req/min for AI endpoints
 - **Disclaimer**: `Disclaimer` component included in ALL AI output screens (non-negotiable)
-- **Auth**: JWT (email/password) — watchlist/chat history require login, search/dashboard do not
+- **Auth**: NextAuth.js v5 (Google + Kakao OAuth) — NextAuth issues JWT, FastAPI validates with shared JWT_SECRET (PyJWT). No email/password. watchlist/chat history require login, search/dashboard do not.
 - **Markets**: US (NASDAQ/S&P500) primary via yfinance, KOSPI secondary via FinanceDataReader
 
 ## Recent Changes

@@ -120,17 +120,18 @@ description: "Task list for AI 기반 주가 예측 웹 애플리케이션"
 ### Backend — User Story 3
 
 - [ ] T038 [P] [US3] Create `backend/app/schemas/watchlist.py` — Pydantic 스키마: WatchlistAddRequest(ticker, market, display_name), WatchlistItem(id, ticker, market, display_name, current_price, change_pct, volume, added_at), WatchlistResponse(items, total, limit)
-- [ ] T039 [US3] Implement `backend/app/services/auth.py` — JWT 인증 서비스: create_access_token(), verify_token(), get_password_hash(), verify_password(), get_current_user() 의존성; python-jose + passlib[bcrypt] 사용
-- [ ] T040 [US3] Create `backend/app/routers/auth.py` — POST /api/v1/auth/register(이메일+비밀번호 등록), POST /api/v1/auth/login(JWT 반환); User 모델 DB 저장; main.py에 라우터 등록
+- [ ] T039 [US3] Implement `backend/app/services/auth.py` — NextAuth.js JWT 검증 서비스: verify_nextauth_token(token: str) → dict(user_id, email, name, provider), get_current_user() FastAPI 의존성 (Authorization 헤더 추출 → 토큰 검증 → DB 사용자 조회/생성); PyJWT + 공유 JWT_SECRET 사용; 토큰 만료/유효성 오류 시 401 예외
+- [ ] T040 [US3] Create `backend/app/routers/auth.py` — 3개 엔드포인트: POST /api/v1/auth/verify(NextAuth JWT 검증 + users 테이블 upsert, is_new_user 반환), GET /api/v1/users/me(현재 사용자 프로필+watchlist_count), PUT /api/v1/users/me(name 수정); get_current_user 의존성; contracts/auth.md 계약 준수; main.py에 라우터 등록
 - [ ] T041 [US3] Create `backend/app/routers/watchlist.py` — 3개 엔드포인트: GET /api/v1/watchlist(목록+현재가 조회), POST /api/v1/watchlist(추가, 30개 제한 검증, 중복 방지), DELETE /api/v1/watchlist/{ticker}(삭제); get_current_user 의존성으로 인증; contracts/watchlist.md 계약 준수; main.py에 라우터 등록
 
 ### Frontend — User Story 3
 
-- [ ] T042 [P] [US3] Create `frontend/src/components/WatchlistCard.tsx` — 관심 종목 카드: ticker, display_name, current_price, change_pct, volume 표시; 등락률 색상(양수 초록, 음수 빨강)
-- [ ] T043 [US3] Create `frontend/src/app/watchlist/page.tsx` — 관심 종목 관리 페이지: 비로그인 시 로그인 안내, 로그인 시 WatchlistCard 목록 표시, 개별 종목 삭제 버튼; getWatchlist() API 호출
-- [ ] T044 [US3] Update `frontend/src/app/stock/[ticker]/page.tsx` — 관심 종목 추가/해제 버튼 추가: 로그인 상태 확인, addWatchlist()/removeWatchlist() API 호출, 버튼 상태 토글(추가됨/추가하기)
+- [ ] T042 [P] [US3] Configure NextAuth.js v5 in `frontend/src/auth.ts` — Google + Kakao providers 설정, JWT 콜백(첫 로그인 시 POST /api/v1/auth/verify 호출 → user_id 획득), session 콜백(user_id·provider를 세션에 포함); `frontend/src/app/api/auth/[...nextauth]/route.ts` 핸들러 생성
+- [ ] T043 [P] [US3] Create `frontend/src/components/WatchlistCard.tsx` — 관심 종목 카드: ticker, display_name, current_price, change_pct, volume 표시; 등락률 색상(양수 초록, 음수 빨강)
+- [ ] T044 [US3] Create `frontend/src/app/watchlist/page.tsx` — 관심 종목 관리 페이지: 비로그인 시 Google/Kakao 로그인 버튼 표시(NextAuth.js signIn()), 로그인 시 WatchlistCard 목록 표시, 개별 종목 삭제 버튼; getWatchlist() API 호출
+- [ ] T045 [US3] Update `frontend/src/app/stock/[ticker]/page.tsx` — 관심 종목 추가/해제 버튼 추가: useSession() 훅으로 로그인 상태 확인, addWatchlist()/removeWatchlist() API 호출, 비로그인 시 로그인 유도
 
-**Checkpoint**: User Story 3 독립 완료 — 회원가입 → 로그인 → AAPL 관심 추가 → 관심 종목 화면에서 현재가 표시 확인.
+**Checkpoint**: User Story 3 독립 완료 — Google/Kakao 로그인 → AAPL 관심 추가 → 관심 종목 화면에서 현재가 표시 확인.
 
 ---
 
@@ -142,14 +143,14 @@ description: "Task list for AI 기반 주가 예측 웹 애플리케이션"
 
 ### Backend — User Story 4
 
-- [ ] T045 [US4] Extend `backend/app/routers/ai.py` — POST /api/v1/ai/chat 엔드포인트 추가: 종목 데이터(있을 경우) 조회 → Claude 호출(web_search, 종목 컨텍스트 포함, 범위 외 질문 감지 시스템 프롬프트) → SSE 스트리밍; ChatMessage DB 저장(question 즉시, answer 완료 후); contracts/ai.md 계약 준수; slowapi rate limit 분당 10회
+- [ ] T046 [US4] Extend `backend/app/routers/ai.py` — POST /api/v1/ai/chat 엔드포인트 추가: 종목 데이터(있을 경우) 조회 → Claude 호출(web_search, 종목 컨텍스트 포함, 범위 외 질문 감지 시스템 프롬프트) → SSE 스트리밍; ChatMessage DB 저장(question 즉시, answer 완료 후); contracts/ai.md 계약 준수; slowapi rate limit 분당 10회
 
 ### Frontend — User Story 4
 
-- [ ] T046 [P] [US4] Create `frontend/src/components/ChatInterface.tsx` — 챗봇 UI 컴포넌트: 메시지 목록(사용자/AI 말풍선), 입력창+전송 버튼, SSE 스트리밍 텍스트 실시간 표시(타이핑 인디케이터), out_of_scope 이벤트 처리, disclaimer 이벤트 처리, 모바일 반응형
-- [ ] T047 [US4] Create `frontend/src/app/chat/page.tsx` — 챗봇 페이지: 상단 종목 선택(선택적), ChatInterface 컴포넌트 렌더링, 페이지 하단 Disclaimer 표시
+- [ ] T047 [P] [US4] Create `frontend/src/components/ChatInterface.tsx` — 챗봇 UI 컴포넌트: 메시지 목록(사용자/AI 말풍선), 입력창+전송 버튼, SSE 스트리밍 텍스트 실시간 표시(타이핑 인디케이터), out_of_scope 이벤트 처리, disclaimer 이벤트 처리, 모바일 반응형
+- [ ] T048 [US4] Create `frontend/src/app/chat/page.tsx` — 챗봇 페이지: 상단 종목 선택(선택적), ChatInterface 컴포넌트 렌더링, 페이지 하단 Disclaimer 표시
 
-**Checkpoint**: User Story 4 독립 완료 — 챗봇 페이지 → "AAPL RSI 현황은?" 질문 → 스트리밍 답변 수신 확인.
+**Checkpoint**: User Story 4 독립 완료 — 챗봇 페이지 → "AAPL RSI 현황은?" 질문 → SSE 스트리밍 답변 수신 확인.
 
 ---
 
@@ -161,13 +162,13 @@ description: "Task list for AI 기반 주가 예측 웹 애플리케이션"
 
 ### Backend — User Story 5
 
-- [ ] T048 [P] [US5] Create `backend/app/schemas/score.py` — Pydantic 스키마: ScoreItem(ticker, display_name, market, current_price, change_pct, buy_score, total_score, analyzed_at, in_watchlist), ScoreRankingResponse(market, sort_by, as_of, items, total, disclaimer)
-- [ ] T049 [US5] Create `backend/app/routers/scores.py` — 2개 엔드포인트: GET /api/v1/stocks/{ticker}/score(최신 캐시에서 buy_score 조회, 없으면 404), GET /api/v1/scores/ranking(watchlist_only=true 시 인증 필요, analysis_cache에서 유효 점수 조회, sort 파라미터별 정렬, disclaimer 항상 포함); contracts/scores.md 계약 준수; main.py에 라우터 등록
+- [ ] T049 [P] [US5] Create `backend/app/schemas/score.py` — Pydantic 스키마: ScoreItem(ticker, display_name, market, current_price, change_pct, buy_score, total_score, analyzed_at, in_watchlist), ScoreRankingResponse(market, sort_by, as_of, items, total, disclaimer)
+- [ ] T050 [US5] Create `backend/app/routers/scores.py` — 2개 엔드포인트: GET /api/v1/stocks/{ticker}/score(최신 캐시에서 buy_score 조회, 없으면 404), GET /api/v1/scores/ranking(watchlist_only=true 시 인증 필요, analysis_cache에서 유효 점수 조회, sort 파라미터별 정렬, disclaimer 항상 포함); contracts/scores.md 계약 준수; main.py에 라우터 등록
 
 ### Frontend — User Story 5
 
-- [ ] T050 [P] [US5] Create `frontend/src/components/ScoreTable.tsx` — 점수 비교 테이블 컴포넌트: 종목별 단기/중기/장기 점수 표시, 점수별 색상 코딩(ScoreGauge 색상 기준), 클릭 시 점수 근거 토글 표시, 정렬(단기/중기/장기/종합) 지원, 모바일 반응형(카드 레이아웃)
-- [ ] T051 [US5] Create `frontend/src/app/scores/page.tsx` — 예측 점수 비교 페이지: 비로그인 시 관심 종목 추가 안내, 분석 없는 종목 안내("AI 분석 먼저 실행"), ScoreTable 렌더링, 정렬 탭(단기/중기/장기/종합), Disclaimer 컴포넌트 포함
+- [ ] T051 [P] [US5] Create `frontend/src/components/ScoreTable.tsx` — 점수 비교 테이블 컴포넌트: 종목별 단기/중기/장기 점수 표시, 점수별 색상 코딩(ScoreGauge 색상 기준), 클릭 시 점수 근거 토글 표시, 정렬(단기/중기/장기/종합) 지원, 모바일 반응형(카드 레이아웃)
+- [ ] T052 [US5] Create `frontend/src/app/scores/page.tsx` — 예측 점수 비교 페이지: 비로그인 시 관심 종목 추가 안내, 분석 없는 종목 안내("AI 분석 먼저 실행"), ScoreTable 렌더링, 정렬 탭(단기/중기/장기/종합), Disclaimer 컴포넌트 포함
 
 **Checkpoint**: User Story 5 독립 완료 — 관심 종목 2개 AI 분석 → 점수 비교 화면에서 ScoreTable 표시 + 점수 근거 토글 확인. quickstart.md P5 체크리스트 통과.
 
@@ -177,12 +178,12 @@ description: "Task list for AI 기반 주가 예측 웹 애플리케이션"
 
 **Purpose**: 전체 사용자 스토리에 영향을 미치는 개선 사항
 
-- [ ] T052 [P] Create `frontend/src/app/events/page.tsx` — 글로벌 이벤트 요약 페이지: 최근 AI 분석에서 추출된 global_events_summary 조회 (analysis_cache 최신 5개), 각 이벤트 카드 표시
-- [ ] T053 [P] Apply `slowapi` rate limiting in `backend/app/main.py` — 전역 limiter 설정, /api/v1/ai/* 엔드포인트 분당 5회, 나머지 엔드포인트 분당 30회; 429 응답 시 Retry-After 헤더 포함
-- [ ] T054 Add expired analysis_cache cleanup in `backend/app/services/cache.py` — get_valid_cache() 내에서 만료 레코드 삭제 또는 별도 cleanup_expired() 함수 추가
-- [ ] T055 [P] Mobile responsiveness validation — 각 페이지(/, /stock/[ticker], /scores, /watchlist, /chat)를 375px viewport에서 수동 검증; Tailwind `sm:` 브레이크포인트로 반응형 미적용 요소 수정
-- [ ] T056 [P] Add Claude API retry logic in `backend/app/services/claude.py` — httpx 타임아웃/5xx 오류 시 최대 2회 재시도, 최종 실패 시 503 예외 발생
-- [ ] T057 Run `specs/001-stock-prediction-app/quickstart.md` E2E validation — 전체 체크리스트(P1~P5) 순서대로 수동 실행, 모든 항목 통과 확인
+- [ ] T053 [P] Create `frontend/src/app/events/page.tsx` — 글로벌 이벤트 요약 페이지: 최근 AI 분석에서 추출된 global_events_summary 조회 (analysis_cache 최신 5개), 각 이벤트 카드 표시
+- [ ] T054 [P] Apply `slowapi` rate limiting in `backend/app/main.py` — 전역 limiter 설정, /api/v1/ai/* 엔드포인트 분당 5회, 나머지 엔드포인트 분당 30회; 429 응답 시 Retry-After 헤더 포함
+- [ ] T055 Add expired analysis_cache cleanup in `backend/app/services/cache.py` — get_valid_cache() 내에서 만료 레코드 삭제 또는 별도 cleanup_expired() 함수 추가
+- [ ] T056 [P] Mobile responsiveness validation — 각 페이지(/, /stock/[ticker], /scores, /watchlist, /chat)를 375px viewport에서 수동 검증; Tailwind `sm:` 브레이크포인트로 반응형 미적용 요소 수정
+- [ ] T057 [P] Add Claude API retry logic in `backend/app/services/claude.py` — httpx 타임아웃/5xx 오류 시 최대 2회 재시도, 최종 실패 시 503 예외 발생
+- [ ] T058 Run `specs/001-stock-prediction-app/quickstart.md` E2E validation — 전체 체크리스트(P1~P5) 순서대로 수동 실행, 모든 항목 통과 확인
 
 ---
 

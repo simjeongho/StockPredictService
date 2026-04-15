@@ -121,6 +121,17 @@ cp .env.local.example .env.local
 `.env.local`:
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-shared-secret-here          # JWT_SECRET과 동일한 값
+NEXTAUTH_BACKEND_URL=http://localhost:8000
+
+# Google OAuth — https://console.cloud.google.com
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# Kakao OAuth — https://developers.kakao.com
+KAKAO_CLIENT_ID=your-kakao-rest-api-key
+KAKAO_CLIENT_SECRET=your-kakao-client-secret     # 선택적
 ```
 
 ### 3-3. 개발 서버 실행
@@ -193,11 +204,16 @@ curl -N -X POST "http://localhost:8000/api/v1/ai/analyze" \
 ### P3: 관심 종목
 
 ```bash
-# 로그인 (토큰 획득)
-TOKEN=$(curl -s -X POST "http://localhost:8000/api/v1/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com", "password": "password"}' \
-  | jq -r '.access_token')
+# 1. 브라우저에서 http://localhost:3000/watchlist 접속
+#    → "Google로 로그인" 버튼 클릭 → OAuth 플로우 완료
+#
+# 2. NextAuth.js가 발급한 JWT 토큰 확인 (개발자 도구 → Network 탭)
+#    → Authorization: Bearer {token} 헤더 확인
+#
+# 3. curl 테스트용 토큰 획득:
+TOKEN=$(curl -s -X POST "http://localhost:8000/api/v1/auth/verify" \
+  -H "Authorization: Bearer {nextauth_jwt_from_browser}" \
+  | jq -r '.user_id')
 
 # 관심 종목 추가
 curl -X POST "http://localhost:8000/api/v1/watchlist" \
