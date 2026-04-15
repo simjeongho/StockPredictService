@@ -25,22 +25,28 @@ Watchlist (N) ──────< AnalysisCache (1 per ticker+market)
 
 ### users
 
-사용자 계정 정보.
+사용자 계정 정보. 소셜 로그인(Google/Kakao)으로만 계정 생성. 비밀번호 없음.
 
 | 컬럼 | 타입 | 제약 | 설명 |
 |------|------|------|------|
-| id | UUID | PK, DEFAULT gen_random_uuid() | 사용자 고유 ID |
-| email | VARCHAR(255) | UNIQUE, NOT NULL | 로그인 이메일 |
-| hashed_password | VARCHAR(255) | NOT NULL | bcrypt 해시 |
+| id | UUID | PK, DEFAULT gen_random_uuid() | 사용자 고유 ID (JWT의 user_id) |
+| email | VARCHAR(255) | NOT NULL | OAuth 제공자로부터 받은 이메일 |
+| name | VARCHAR(100) | NOT NULL | 표시 이름 (OAuth 제공자로부터) |
+| provider | VARCHAR(20) | NOT NULL, CHECK(provider IN ('google','kakao')) | OAuth 제공자 |
+| provider_account_id | VARCHAR(255) | NOT NULL | OAuth 제공자 내부 계정 ID |
 | is_active | BOOLEAN | NOT NULL, DEFAULT TRUE | 계정 활성 여부 |
-| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | 가입일시 |
+| created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | 최초 로그인(가입)일시 |
 
-**인덱스**: `email` (UNIQUE)
+**인덱스**:
+- `(provider, provider_account_id)` UNIQUE — 동일 제공자·계정 중복 방지
+- `email` (non-unique index) — 이메일 조회용
 
 **비즈니스 규칙**:
 - 이메일은 소문자 정규화 후 저장
-- 비밀번호는 평문 저장 금지 (bcrypt 해시만 저장)
+- 최초 소셜 로그인 시 자동 계정 생성 (POST /api/v1/auth/verify 호출)
+- 동일 이메일이라도 provider가 다르면 별도 계정 (Google·Kakao 계정 통합 미지원)
 - `is_active = false`는 계정 비활성화 (삭제 대신 소프트 비활성화)
+- `hashed_password` 컬럼 없음 — OAuth 전용
 
 ---
 

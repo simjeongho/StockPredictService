@@ -10,7 +10,8 @@
 ## Technical Context
 
 **Language/Version**: Python 3.11+ (Backend), TypeScript / Node.js 20+ (Frontend — Next.js 14+)
-**Primary Dependencies**: FastAPI + Uvicorn (backend), Next.js 14 App Router + Tailwind CSS + Lightweight Charts (frontend), Anthropic Python SDK (AI), yfinance + FinanceDataReader + pandas_ta (data & indicators), SQLAlchemy[asyncio] + asyncpg + Alembic (ORM & migrations), slowapi (rate limiting)
+**Primary Dependencies**: FastAPI + Uvicorn (backend), Next.js 14 App Router + Tailwind CSS + Lightweight Charts + NextAuth.js v5 (frontend), Anthropic Python SDK (AI), yfinance + FinanceDataReader + pandas_ta (data & indicators), SQLAlchemy[asyncio] + asyncpg + Alembic (ORM & migrations), slowapi (rate limiting), PyJWT (JWT verification)
+**Authentication**: NextAuth.js v5 (Auth.js) — 프론트엔드에서 Google OAuth 2.0 + Kakao OAuth 2.0 처리 → JWT 발급 → FastAPI가 공유 JWT_SECRET으로 검증. 이메일/비밀번호 인증 없음.
 **Storage**: PostgreSQL (Railway 초기, AWS RDS 향후) — SQLAlchemy async ORM + Alembic migrations
 **Testing**: pytest + httpx (backend async tests), Vitest + React Testing Library (frontend)
 **Target Platform**: 반응형 웹 (모바일 375px 이상) — Vercel (frontend), Railway Hobby $5/월 (backend + PostgreSQL)
@@ -49,7 +50,8 @@ specs/001-stock-prediction-app/
 │   ├── stocks.md        # 주가 데이터 API 계약
 │   ├── ai.md            # AI 분석·챗봇 API 계약
 │   ├── watchlist.md     # 관심 종목 API 계약
-│   └── scores.md        # 예측 점수 API 계약
+│   ├── scores.md        # 예측 점수 API 계약
+│   └── auth.md          # 인증 API 계약 (NextAuth.js v5 + OAuth)
 └── tasks.md             # /speckit.tasks 생성
 ```
 
@@ -74,13 +76,15 @@ backend/
 │   │   ├── ai.py                  # /api/v1/ai 라우터 (SSE 스트리밍)
 │   │   ├── watchlist.py           # /api/v1/watchlist 라우터
 │   │   ├── scores.py              # /api/v1/scores 라우터
+│   │   ├── auth.py                # /api/v1/auth/verify, /api/v1/users/me
 │   │   └── health.py              # /health 헬스체크
 │   └── services/
 │       ├── market_data.py         # yfinance + FDR 데이터 수집
 │       ├── indicators.py          # pandas_ta 기술 지표 계산
 │       ├── claude.py              # Claude API 호출 (SSE 스트리밍)
 │       ├── cache.py               # 분석 결과 캐싱 (PostgreSQL TTL)
-│       └── score_parser.py        # 응답에서 buy_score JSON 파싱
+│       ├── score_parser.py        # 응답에서 buy_score JSON 파싱
+│       └── auth.py                # NextAuth.js JWT 토큰 검증 (PyJWT)
 ├── alembic/
 │   ├── env.py
 │   └── versions/
@@ -97,6 +101,8 @@ backend/
 frontend/
 ├── src/
 │   ├── app/                        # Next.js 14 App Router
+│   │   ├── api/auth/[...nextauth]/
+│   │   │   └── route.ts            # NextAuth.js v5 라우트 핸들러
 │   │   ├── layout.tsx              # 루트 레이아웃 (네비게이션, 면책 고지)
 │   │   ├── page.tsx                # / 메인 대시보드 (시장 요약 + 검색)
 │   │   ├── stock/[ticker]/
@@ -118,6 +124,7 @@ frontend/
 │   │   └── Disclaimer.tsx          # 면책 고지 컴포넌트 (재사용)
 │   ├── services/
 │   │   └── api.ts                  # Axios 인스턴스 + 모든 API 호출 함수
+│   ├── auth.ts                     # NextAuth.js v5 설정 (providers, callbacks, secret)
 │   └── types/
 │       └── index.ts                # 공통 TypeScript 타입 정의
 ├── public/
