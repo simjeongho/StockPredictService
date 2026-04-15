@@ -101,11 +101,13 @@ docker run -p 8000:8000 --env-file .env stock-backend
 - **Rate Limiting**: slowapi — 30 req/min global, 5 req/min for AI endpoints
 - **Disclaimer**: `Disclaimer` component included in ALL AI output screens (non-negotiable)
 - **Auth**: NextAuth.js v5 (Google + Kakao OAuth) — NextAuth issues JWT, FastAPI validates with shared JWT_SECRET (PyJWT). No email/password. watchlist/chat history require login, search/dashboard do not.
+- **Account Deletion**: `DELETE /api/v1/users/me` — soft delete (`is_active=false`, `deleted_at=now()`), CASCADE watchlist delete, anonymize chat_messages (user_id→NULL). Satisfies Constitution §Data&Privacy MUST.
 - **Markets**: US (NASDAQ/S&P500) primary via yfinance, KOSPI secondary via FinanceDataReader
 
 ## Recent Changes
 
 - **001-stock-prediction-app** (2026-04-15): Initial feature — full app spec, plan, data model, API contracts, quickstart
+- **001-stock-prediction-app** (2026-04-15): Amendment — add FR-020 account deletion (DELETE /api/v1/users/me), resolve Constitution §Data&Privacy violation; tasks T060–T063 added
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

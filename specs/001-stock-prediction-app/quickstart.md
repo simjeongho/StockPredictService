@@ -236,6 +236,30 @@ curl "http://localhost:8000/api/v1/scores/ranking?watchlist_only=true" \
 # 기대: 관심 종목 단기/중기/장기 점수 목록
 ```
 
+### P3-EXT: 회원 탈퇴 (FR-020)
+
+```bash
+# 1. 탈퇴 전 관심 종목 확인
+curl "http://localhost:8000/api/v1/watchlist" \
+  -H "Authorization: Bearer $TOKEN"
+# 기대: 종목 목록 반환
+
+# 2. 회원 탈퇴 요청
+curl -X DELETE "http://localhost:8000/api/v1/users/me" \
+  -H "Authorization: Bearer $TOKEN"
+# 기대: 204 No Content
+
+# 3. 탈퇴 후 관심 종목 조회 시 401 반환 확인
+curl "http://localhost:8000/api/v1/watchlist" \
+  -H "Authorization: Bearer $TOKEN"
+# 기대: 401 UNAUTHORIZED (삭제된 계정)
+```
+
+브라우저에서:
+- [ ] `watchlist` 또는 프로필 페이지 → "회원 탈퇴" 버튼 클릭 → 확인 모달 표시
+- [ ] 확인 후 탈퇴 처리 → 로그아웃 + 메인 페이지 이동
+- [ ] 탈퇴 전 등록한 관심 종목이 사라졌는지 확인 (동일 계정으로 재가입 시)
+
 ---
 
 ## 6. 테스트 실행

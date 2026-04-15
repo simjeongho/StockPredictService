@@ -31,10 +31,12 @@
 | III. 사용자 접근성 | ✅ PASS | 점수 색상 시각화(0~20 빨강 → 81~100 초록). 핵심 흐름 5분 내 완료(SC-006). 반응형 웹(FR-018). 면책 고지 100% 표시(SC-005). |
 | IV. 점진적 가치 전달 | ✅ PASS | 5개 사용자 스토리(P1–P5). P1(검색+대시보드)만으로 독립 배포 가능 MVP. 각 스토리 독립 테스트 가능. |
 | V. 단순성 & 유지보수성 | ✅ PASS | 각 의존성은 현재 요구사항에 의해 정당화됨. 별도 웹 검색 API 불필요(Claude web_search 활용으로 통합). 추상화 최소화. |
+| §Data&Privacy: 개인 데이터 삭제 | ✅ PASS | `DELETE /api/v1/users/me` 엔드포인트 추가 (FR-020). 탈퇴 시 watchlist 삭제 + chat_messages 익명화. 헌법 MUST 충족. |
 
 **GATE RESULT: ✅ PASS** — 모든 원칙 충족. Phase 0 진행 가능.
 
 *Post-Phase 1 re-check*: 설계 완료 후 DB 스키마, API 계약이 Principle I(데이터 무결성) 및 Principle II(투명성)을 침해하지 않는지 재검증 완료. ✅
+*Amendment (2026-04-15)*: 회원 탈퇴 기능(FR-020) 추가 — 헌법 §Data&Privacy MUST 위반 해소. ✅
 
 ## Project Structure
 

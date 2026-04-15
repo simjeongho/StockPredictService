@@ -147,6 +147,53 @@ Authorization: Bearer {nextauth_jwt_token}
 
 ---
 
+## DELETE /api/v1/users/me
+
+회원 탈퇴. 인증된 사용자 본인의 계정을 소프트 삭제하고 관련 개인 데이터를 정리한다.
+
+**Authentication**: JWT 인증 필요
+
+### Request
+
+```
+DELETE /api/v1/users/me
+Authorization: Bearer {nextauth_jwt_token}
+```
+
+(Request body 없음)
+
+### 처리 순서
+
+1. JWT 토큰 검증 → `user_id` 추출
+2. `watchlist` 테이블에서 해당 `user_id`의 모든 레코드 물리 삭제
+3. `chat_messages` 테이블에서 해당 `user_id`를 NULL로 익명화 (`UPDATE ... SET user_id = NULL`)
+4. `users` 테이블: `is_active = false`, `deleted_at = now()` 설정
+5. 204 No Content 반환
+
+### Response 204 — 탈퇴 성공
+
+(응답 바디 없음)
+
+### Response 401 — 미인증
+
+```json
+{
+  "error": "UNAUTHORIZED",
+  "message": "로그인이 필요합니다."
+}
+```
+
+### Response 409 — 이미 탈퇴한 계정
+
+```json
+{
+  "error": "ALREADY_DELETED",
+  "message": "이미 탈퇴한 계정입니다."
+}
+```
+
+---
+
 ## 환경변수 (공유 JWT_SECRET)
 
 NextAuth.js와 FastAPI가 동일한 JWT_SECRET을 공유한다.

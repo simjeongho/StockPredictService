@@ -34,8 +34,9 @@ Watchlist (N) ──────< AnalysisCache (1 per ticker+market)
 | name | VARCHAR(100) | NOT NULL | 표시 이름 (OAuth 제공자로부터) |
 | provider | VARCHAR(20) | NOT NULL, CHECK(provider IN ('google','kakao')) | OAuth 제공자 |
 | provider_account_id | VARCHAR(255) | NOT NULL | OAuth 제공자 내부 계정 ID |
-| is_active | BOOLEAN | NOT NULL, DEFAULT TRUE | 계정 활성 여부 |
+| is_active | BOOLEAN | NOT NULL, DEFAULT TRUE | 계정 활성 여부 (탈퇴 시 FALSE) |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() | 최초 로그인(가입)일시 |
+| deleted_at | TIMESTAMPTZ | NULL | 탈퇴 처리 일시 (NULL = 활성 계정) |
 
 **인덱스**:
 - `(provider, provider_account_id)` UNIQUE — 동일 제공자·계정 중복 방지
@@ -47,6 +48,9 @@ Watchlist (N) ──────< AnalysisCache (1 per ticker+market)
 - 동일 이메일이라도 provider가 다르면 별도 계정 (Google·Kakao 계정 통합 미지원)
 - `is_active = false`는 계정 비활성화 (삭제 대신 소프트 비활성화)
 - `hashed_password` 컬럼 없음 — OAuth 전용
+- **탈퇴 처리**: `is_active = false` + `deleted_at = now()` 동시 설정; watchlist CASCADE 삭제; chat_messages.user_id → NULL 익명화
+- `deleted_at IS NOT NULL`인 계정으로 재로그인 시도 시 → 403 반환; 동일 OAuth 계정으로 재가입은 허용 (신규 UUID 발급)
+- `analysis_cache`는 종목 단위 공유 데이터이므로 탈퇴 시 삭제하지 않음
 
 ---
 
