@@ -1,12 +1,46 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import type { Candle } from "@/types";
+
+export type CandleType = "daily" | "weekly" | "monthly";
 
 interface StockChartProps {
   candles: Candle[];
   ticker: string;
   market?: "us" | "kr";
+  candleType?: CandleType;
+}
+
+function aggregateCandles(candles: Candle[], type: CandleType): Candle[] {
+  if (type === "daily") return candles;
+
+  const groups = new Map<string, Candle[]>();
+  for (const c of candles) {
+    const d = new Date(c.time);
+    let key: string;
+    if (type === "weekly") {
+      const day = d.getDay();
+      const monday = new Date(d);
+      monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+      key = monday.toISOString().slice(0, 10);
+    } else {
+      key = c.time.slice(0, 7) + "-01";
+    }
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(c);
+  }
+
+  return Array.from(groups.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([time, cs]) => ({
+      time,
+      open: cs[0].open,
+      high: Math.max(...cs.map((c) => c.high)),
+      low: Math.min(...cs.map((c) => c.low)),
+      close: cs[cs.length - 1].close,
+      volume: cs.reduce((s, c) => s + c.volume, 0),
+    }));
 }
 
 // n-기간 단순이동평균
@@ -72,22 +106,25 @@ const MA_CONFIGS = [
   { period: 200, color: "#8B5CF6", label: "MA200" },
 ];
 
-export default function StockChart({ candles, ticker, market = "us" }: StockChartProps) {
+export default function StockChart({ candles, ticker, market = "us", candleType = "daily" }: StockChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!chartContainerRef.current || candles.length === 0) return;
+  const displayCandles = useMemo(() => aggregateCandles(candles, candleType), [candles, candleType]);
 
+  useEffect(() => {
+    if (!chartContainerRef.current || displayCandles.length === 0) return;
+
+    // unmounted 플래그: async import 완료 전에 cleanup이 실행되면 chart 생성 자체를 막음
+    let unmounted = false;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let chart: any = null;
-    let cleanupFn: (() => void) | undefined;
 
     // 미리 계산 (시간 → 값 Map으로 변환해 O(1) 조회)
-    const rsiData = computeRSI(candles, 14);
+    const rsiData = computeRSI(displayCandles, 14);
     const rsiMap = new Map(rsiData.map((d) => [d.time, d.value]));
 
-    const bbData = computeBollinger(candles, 20, 2);
+    const bbData = computeBollinger(displayCandles, 20, 2);
     const bbUpperMap = new Map(bbData.upper.map((d) => [d.time, d.value]));
     const bbMiddleMap = new Map(bbData.middle.map((d) => [d.time, d.value]));
     const bbLowerMap = new Map(bbData.lower.map((d) => [d.time, d.value]));
@@ -98,8 +135,16 @@ export default function StockChart({ candles, ticker, market = "us" }: StockChar
         ? v.toLocaleString("ko-KR", { maximumFractionDigits: 0 })
         : v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+    // 반응형 리사이즈 — cleanup에서 정확히 제거할 수 있도록 async 블록 바깥에 정의
+    const handleResize = () => {
+      if (chart && chartContainerRef.current) {
+        chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+      }
+    };
+    window.addEventListener("resize", handleResize);
+
     import("lightweight-charts").then(({ createChart, ColorType }) => {
-      if (!chartContainerRef.current) return;
+      if (unmounted || !chartContainerRef.current) return;
 
       chart = createChart(chartContainerRef.current, {
         layout: {
@@ -130,7 +175,7 @@ export default function StockChart({ candles, ticker, market = "us" }: StockChar
         wickDownColor: "#ef4444",
       });
       candleSeries.setData(
-        candles.map((c) => ({
+        displayCandles.map((c) => ({
           time: c.time as `${number}-${number}-${number}`,
           open: c.open,
           high: c.high,
@@ -141,8 +186,8 @@ export default function StockChart({ candles, ticker, market = "us" }: StockChar
 
       // 이동평균선
       for (const { period, color } of MA_CONFIGS) {
-        if (candles.length < period) continue;
-        const maData = computeSMA(candles, period);
+        if (displayCandles.length < period) continue;
+        const maData = computeSMA(displayCandles, period);
         const maSeries = chart.addLineSeries({
           color,
           lineWidth: 1,
@@ -164,7 +209,7 @@ export default function StockChart({ candles, ticker, market = "us" }: StockChar
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let bbLowerSeries: any = null;
 
-      if (candles.length >= 20) {
+      if (displayCandles.length >= 20) {
         bbUpperSeries = chart.addLineSeries({
           color: "#22d3ee",
           lineWidth: 1,
@@ -279,29 +324,18 @@ export default function StockChart({ candles, ticker, market = "us" }: StockChar
         tip.style.top = `${top}px`;
       });
 
-      // 반응형 리사이즈
-      const handleResize = () => {
-        if (chart && chartContainerRef.current) {
-          chart.applyOptions({ width: chartContainerRef.current.clientWidth });
-        }
-      };
-      window.addEventListener("resize", handleResize);
-
-      cleanupFn = () => {
-        window.removeEventListener("resize", handleResize);
-        chart?.remove();
-        chart = null;
-      };
     });
 
     return () => {
-      if (cleanupFn) cleanupFn();
-      else chart?.remove();
+      unmounted = true;
+      window.removeEventListener("resize", handleResize);
+      chart?.remove();
+      chart = null;
     };
-  }, [candles, ticker, market]);
+  }, [displayCandles, ticker, market]);
 
-  const visibleMAs = MA_CONFIGS.filter((m) => candles.length >= m.period);
-  const showBollinger = candles.length >= 20;
+  const visibleMAs = MA_CONFIGS.filter((m) => displayCandles.length >= m.period);
+  const showBollinger = displayCandles.length >= 20;
 
   return (
     <div className="space-y-3">

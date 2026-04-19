@@ -49,7 +49,7 @@ async def search_stocks(
 @router.get("/{ticker}/price", response_model=PriceResponse)
 async def get_price(
     ticker: str,
-    period: Literal["1m", "3m", "6m", "1y"] = Query("1m"),
+    period: Literal["1m", "3m", "6m", "1y", "3y", "5y"] = Query("1y"),
     market: Literal["us", "kr"] = Query("us"),
 ):
     """주가 OHLCV 캔들 데이터 반환."""

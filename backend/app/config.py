@@ -23,6 +23,13 @@ class Settings(BaseSettings):
     # Cache TTL (초)
     analysis_cache_ttl_seconds: int = 600
 
+    # 관리자 이메일 (쉼표 구분)
+    admin_emails: str = ""
+
+    @property
+    def admin_emails_list(self) -> list[str]:
+        return [e.strip() for e in self.admin_emails.split(",") if e.strip()]
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",")]

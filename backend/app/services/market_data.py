@@ -1,6 +1,6 @@
 """yfinance(미국) + FinanceDataReader(한국) 통합 시장 데이터 서비스."""
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 import pandas as pd
@@ -13,6 +13,18 @@ PERIOD_MAP = {
     "3m": "3mo",
     "6m": "6mo",
     "1y": "1y",
+    "3y": "3y",
+    "5y": "5y",
+}
+
+# KR 시장용 기간별 일수 (FinanceDataReader는 start date 방식)
+KR_PERIOD_DAYS = {
+    "1m": 31,
+    "3m": 92,
+    "6m": 183,
+    "1y": 365,
+    "3y": 1095,
+    "5y": 1825,
 }
 
 # 미국 지수 티커
@@ -115,7 +127,9 @@ async def get_ohlcv(
         else:
             import FinanceDataReader as fdr
 
-            df = fdr.DataReader(ticker, period="2024-01-01")
+            days = KR_PERIOD_DAYS.get(period, 365)
+            start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+            df = fdr.DataReader(ticker, start_date)
             status = "closed"
 
         if df.empty:

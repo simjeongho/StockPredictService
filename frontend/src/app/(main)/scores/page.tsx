@@ -90,6 +90,40 @@ export default function ScoresPage() {
         </button>
       </div>
 
+      {/* 점수 설명 카드 */}
+      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-5">
+        <h2 className="text-sm font-semibold text-slate-300 mb-3">점수 기준 안내</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
+          {[
+            { label: "단기 (1주)", desc: "1주일 이내 단기 가격 움직임 전망" },
+            { label: "중기 (3개월)", desc: "3개월 중기 추세 및 모멘텀 분석" },
+            { label: "장기 (1년)", desc: "1년 장기 펀더멘털 및 성장성 평가" },
+          ].map(({ label, desc }) => (
+            <div key={label} className="bg-white/[0.03] border border-white/10 rounded-xl p-3">
+              <p className="text-xs font-medium text-slate-300 mb-1">{label}</p>
+              <p className="text-xs text-slate-500">{desc}</p>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { range: "0–20", label: "강력 매도", color: "#EF4444" },
+            { range: "21–40", label: "매도 고려", color: "#F97316" },
+            { range: "41–60", label: "중립", color: "#EAB308" },
+            { range: "61–80", label: "매수 고려", color: "#84CC16" },
+            { range: "81–100", label: "강력 매수", color: "#22C55E" },
+          ].map(({ range, label, color }) => (
+            <span
+              key={label}
+              className="text-xs px-2.5 py-1 rounded-full font-medium border"
+              style={{ color, backgroundColor: color + "20", borderColor: color + "40" }}
+            >
+              {range} {label}
+            </span>
+          ))}
+        </div>
+      </div>
+
       <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
         {loading ? (
           <div className="py-12 text-center text-slate-500">점수 데이터 로딩 중...</div>

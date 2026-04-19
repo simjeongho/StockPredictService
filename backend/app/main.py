@@ -6,7 +6,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from app.config import get_settings
-from app.routers import health, stocks, ai, auth, watchlist, scores
+from app.routers import health, stocks, ai, auth, watchlist, scores, market, admin, history
 
 settings = get_settings()
 
@@ -38,6 +38,9 @@ app.include_router(ai.router)
 app.include_router(auth.router)
 app.include_router(watchlist.router)
 app.include_router(scores.router)
+app.include_router(market.router)
+app.include_router(admin.router)
+app.include_router(history.router)
 
 
 # 전역 예외 핸들러

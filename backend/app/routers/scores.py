@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from app.database import get_db
 from app.models.analysis_cache import AnalysisCache
+from app.models.analysis_history import AnalysisHistory
 from app.models.watchlist import Watchlist
 from app.models.user import User
 from app.schemas.score import (
@@ -46,7 +47,7 @@ def _score_label(score: int) -> str:
     return "강력 매수"
 
 
-def _build_buy_score(cache: AnalysisCache) -> BuyScoreWithColor:
+def _build_buy_score(cache: AnalysisCache | AnalysisHistory) -> BuyScoreWithColor:
     def term(score: int | None, label: str | None, period: str) -> BuyScoreTermWithColor:
         s = score if score is not None else 50
         lbl = label or _score_label(s)
@@ -128,20 +129,27 @@ async def get_score_ranking(
         )
         watchlist_map = {row[0]: row[1] for row in wl_result.fetchall()}
 
-    # 캐시 쿼리
-    query = (
-        select(AnalysisCache)
-        .where(
-            AnalysisCache.market == market,
-            AnalysisCache.expires_at > now,
-            AnalysisCache.buy_score_short.is_not(None),
+    # 비로그인 상태에서 watchlist_only=False로 호출된 경우 — 빈 결과 반환
+    if not current_user:
+        return ScoreRankingResponse(
+            market=market, sort_by=sort_by, as_of=now.isoformat(),
+            items=[], total=0, disclaimer=DISCLAIMER,
         )
-        .order_by(AnalysisCache.created_at.desc())
+
+    # analysis_history 기반 쿼리 (영구 기록 — TTL 없음, 종목 분석만)
+    query = (
+        select(AnalysisHistory)
+        .where(
+            AnalysisHistory.user_id == current_user.id,
+            AnalysisHistory.market == market,
+            AnalysisHistory.buy_score_short.is_not(None),
+            AnalysisHistory.analysis_type == "stock",
+        )
+        .order_by(AnalysisHistory.created_at.desc())
     )
     if watchlist_only and watchlist_map:
-        query = query.where(AnalysisCache.ticker.in_(watchlist_map.keys()))
+        query = query.where(AnalysisHistory.ticker.in_(watchlist_map.keys()))
     elif watchlist_only:
-        # 관심 종목 없음
         return ScoreRankingResponse(
             market=market,
             sort_by=sort_by,
@@ -152,40 +160,34 @@ async def get_score_ranking(
         )
 
     result = await db.execute(query)
-    caches = result.scalars().all()
+    histories = result.scalars().all()
 
     # ticker당 최신 1개만 유지
-    seen: dict[str, AnalysisCache] = {}
-    for c in caches:
-        if c.ticker not in seen:
-            seen[c.ticker] = c
+    seen: dict[str, AnalysisHistory] = {}
+    for h in histories:
+        if h.ticker not in seen:
+            seen[h.ticker] = h
 
     # ScoreItem 빌드
     items: list[ScoreItem] = []
-    for c in seen.values():
-        short_s = c.buy_score_short or 50
-        mid_s = c.buy_score_mid or 50
-        long_s = c.buy_score_long or 50
+    for h in seen.values():
+        short_s = h.buy_score_short or 50
+        mid_s = h.buy_score_mid or 50
+        long_s = h.buy_score_long or 50
         total = round((short_s + mid_s + long_s) / 3)
-
-        # 지표 스냅샷에서 현재가·등락률 추출 (없으면 0)
-        snapshot: dict = c.indicators_snapshot or {}
-        price_info = snapshot.get("price", {})
-        current_price = float(price_info.get("current", 0))
-        change_pct = float(price_info.get("change_pct", 0))
 
         items.append(
             ScoreItem(
-                ticker=c.ticker,
-                display_name=watchlist_map.get(c.ticker, c.ticker),
-                market=c.market,
-                current_price=current_price,
-                change_pct=change_pct,
-                buy_score=_build_buy_score(c),
+                ticker=h.ticker,
+                display_name=watchlist_map.get(h.ticker, h.ticker),
+                market=h.market,
+                current_price=0.0,
+                change_pct=0.0,
+                buy_score=_build_buy_score(h),
                 total_score=total,
-                analyzed_at=c.created_at.isoformat(),
-                in_watchlist=c.ticker in watchlist_map,
-                score_rationale=c.score_rationale,
+                analyzed_at=h.created_at.isoformat(),
+                in_watchlist=h.ticker in watchlist_map,
+                score_rationale=None,
             )
         )
 
