@@ -4,7 +4,7 @@ from datetime import timezone, datetime
 from typing import Literal
 
 import pandas as pd
-import pandas_ta as ta
+import pandas_ta_classic as ta
 
 logger = logging.getLogger(__name__)
 

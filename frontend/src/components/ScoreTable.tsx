@@ -16,13 +16,10 @@ function ScoreBadge({ score }: { score: number }) {
   const label = getScoreLabel(score);
   return (
     <div className="text-center">
-      <div
-        className="text-lg font-bold"
-        style={{ color }}
-      >
+      <div className="text-lg font-bold" style={{ color }}>
         {score}
       </div>
-      <div className="text-xs text-gray-500">{label}</div>
+      <div className="text-xs text-slate-500">{label}</div>
     </div>
   );
 }
@@ -48,8 +45,8 @@ export default function ScoreTable({ items, sortBy, onSortChange }: ScoreTablePr
             onClick={() => onSortChange(tab.key)}
             className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
               sortBy === tab.key
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                ? "bg-gradient-to-r from-purple-600 to-blue-500 text-white shadow-md shadow-purple-500/20"
+                : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-300"
             }`}
           >
             {tab.label}
@@ -61,13 +58,13 @@ export default function ScoreTable({ items, sortBy, onSortChange }: ScoreTablePr
       <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200">
-              <th className="text-left py-3 px-4 font-medium text-gray-500">종목</th>
-              <th className="text-center py-3 px-4 font-medium text-gray-500">현재가</th>
-              <th className="text-center py-3 px-4 font-medium text-gray-500">단기 (1주)</th>
-              <th className="text-center py-3 px-4 font-medium text-gray-500">중기 (3개월)</th>
-              <th className="text-center py-3 px-4 font-medium text-gray-500">장기 (1년)</th>
-              <th className="text-center py-3 px-4 font-medium text-gray-500">종합</th>
+            <tr className="border-b border-white/10">
+              <th className="text-left py-3 px-4 font-medium text-slate-400">종목</th>
+              <th className="text-center py-3 px-4 font-medium text-slate-400">현재가</th>
+              <th className="text-center py-3 px-4 font-medium text-slate-400">단기 (1주)</th>
+              <th className="text-center py-3 px-4 font-medium text-slate-400">중기 (3개월)</th>
+              <th className="text-center py-3 px-4 font-medium text-slate-400">장기 (1년)</th>
+              <th className="text-center py-3 px-4 font-medium text-slate-400">종합</th>
             </tr>
           </thead>
           <tbody>
@@ -75,7 +72,7 @@ export default function ScoreTable({ items, sortBy, onSortChange }: ScoreTablePr
               <>
                 <tr
                   key={item.ticker}
-                  className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                  className="border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
                   onClick={() =>
                     setExpandedTicker(
                       expandedTicker === item.ticker ? null : item.ticker
@@ -84,18 +81,18 @@ export default function ScoreTable({ items, sortBy, onSortChange }: ScoreTablePr
                 >
                   <td className="py-3 px-4">
                     <button
-                      className="text-left hover:text-blue-600"
+                      className="text-left hover:text-purple-400 transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
                         router.push(`/stock/${item.ticker}?market=${item.market}`);
                       }}
                     >
-                      <div className="font-semibold">{item.ticker}</div>
-                      <div className="text-xs text-gray-500">{item.display_name}</div>
+                      <div className="font-semibold text-slate-50">{item.ticker}</div>
+                      <div className="text-xs text-slate-500">{item.display_name}</div>
                     </button>
                   </td>
                   <td className="py-3 px-4 text-center">
-                    <div>
+                    <div className="text-slate-200">
                       {item.market === "kr"
                         ? `${item.current_price.toLocaleString()}원`
                         : item.current_price > 0
@@ -105,7 +102,7 @@ export default function ScoreTable({ items, sortBy, onSortChange }: ScoreTablePr
                     {item.change_pct !== 0 && (
                       <div
                         className={`text-xs ${
-                          item.change_pct >= 0 ? "text-green-600" : "text-red-600"
+                          item.change_pct >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
                         {item.change_pct >= 0 ? "▲" : "▼"}{" "}
@@ -127,9 +124,9 @@ export default function ScoreTable({ items, sortBy, onSortChange }: ScoreTablePr
                   </td>
                 </tr>
                 {expandedTicker === item.ticker && item.score_rationale && (
-                  <tr key={`${item.ticker}-rationale`} className="bg-blue-50">
-                    <td colSpan={6} className="px-4 py-3 text-sm text-gray-700">
-                      <span className="font-medium">점수 근거: </span>
+                  <tr key={`${item.ticker}-rationale`} className="bg-purple-950/30">
+                    <td colSpan={6} className="px-4 py-3 text-sm text-slate-300">
+                      <span className="font-medium text-violet-400">점수 근거: </span>
                       {item.score_rationale}
                     </td>
                   </tr>
@@ -143,19 +140,19 @@ export default function ScoreTable({ items, sortBy, onSortChange }: ScoreTablePr
       {/* 모바일 카드 레이아웃 */}
       <div className="sm:hidden space-y-3">
         {items.map((item) => (
-          <div key={item.ticker} className="border border-gray-200 rounded-lg p-4">
+          <div key={item.ticker} className="border border-white/10 bg-white/5 rounded-xl p-4">
             <div className="flex items-start justify-between mb-3">
               <button
-                className="text-left hover:text-blue-600"
+                className="text-left hover:text-purple-400 transition-colors"
                 onClick={() =>
                   router.push(`/stock/${item.ticker}?market=${item.market}`)
                 }
               >
-                <div className="font-semibold">{item.ticker}</div>
-                <div className="text-xs text-gray-500">{item.display_name}</div>
+                <div className="font-semibold text-slate-50">{item.ticker}</div>
+                <div className="text-xs text-slate-500">{item.display_name}</div>
               </button>
               <div className="text-right">
-                <div className="text-sm font-medium">
+                <div className="text-sm font-medium text-slate-200">
                   {item.market === "kr"
                     ? `${item.current_price.toLocaleString()}원`
                     : item.current_price > 0
@@ -165,7 +162,7 @@ export default function ScoreTable({ items, sortBy, onSortChange }: ScoreTablePr
                 {item.change_pct !== 0 && (
                   <div
                     className={`text-xs ${
-                      item.change_pct >= 0 ? "text-green-600" : "text-red-600"
+                      item.change_pct >= 0 ? "text-emerald-400" : "text-rose-400"
                     }`}
                   >
                     {item.change_pct >= 0 ? "▲" : "▼"}{" "}
@@ -175,26 +172,21 @@ export default function ScoreTable({ items, sortBy, onSortChange }: ScoreTablePr
               </div>
             </div>
             <div className="grid grid-cols-4 gap-2 text-center">
-              <div>
-                <div className="text-xs text-gray-500 mb-1">단기</div>
-                <ScoreBadge score={item.buy_score.short_term.score} />
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 mb-1">중기</div>
-                <ScoreBadge score={item.buy_score.mid_term.score} />
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 mb-1">장기</div>
-                <ScoreBadge score={item.buy_score.long_term.score} />
-              </div>
-              <div>
-                <div className="text-xs text-gray-500 mb-1">종합</div>
-                <ScoreBadge score={item.total_score} />
-              </div>
+              {[
+                { label: "단기", score: item.buy_score.short_term.score },
+                { label: "중기", score: item.buy_score.mid_term.score },
+                { label: "장기", score: item.buy_score.long_term.score },
+                { label: "종합", score: item.total_score },
+              ].map(({ label, score }) => (
+                <div key={label}>
+                  <div className="text-xs text-slate-500 mb-1">{label}</div>
+                  <ScoreBadge score={score} />
+                </div>
+              ))}
             </div>
             {item.score_rationale && (
               <button
-                className="mt-3 text-xs text-blue-600 hover:underline"
+                className="mt-3 text-xs text-violet-400 hover:text-violet-300 transition-colors"
                 onClick={() =>
                   setExpandedTicker(
                     expandedTicker === item.ticker ? null : item.ticker
@@ -205,7 +197,7 @@ export default function ScoreTable({ items, sortBy, onSortChange }: ScoreTablePr
               </button>
             )}
             {expandedTicker === item.ticker && item.score_rationale && (
-              <div className="mt-2 p-3 bg-blue-50 rounded text-xs text-gray-700">
+              <div className="mt-2 p-3 bg-purple-950/30 rounded-lg text-xs text-slate-300">
                 {item.score_rationale}
               </div>
             )}

@@ -128,7 +128,7 @@ export default function ChatInterface({ ticker, market, token }: ChatInterfacePr
       {/* 메시지 목록 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
-          <p className="text-center text-gray-400 text-sm mt-8">
+          <p className="text-center text-slate-500 text-sm mt-8">
             종목 관련 질문을 입력하세요.
             <br />
             예: &quot;AAPL의 RSI는 과매수 구간인가요?&quot;
@@ -142,17 +142,17 @@ export default function ChatInterface({ ticker, market, token }: ChatInterfacePr
             <div
               className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm ${
                 msg.role === "user"
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-800"
+                  ? "bg-gradient-to-r from-purple-600 to-blue-500 text-white"
+                  : "bg-white/10 text-slate-200 border border-white/10"
               }`}
             >
               <p className="whitespace-pre-wrap">{msg.content}</p>
               {/* 타이핑 인디케이터 */}
               {streaming && msg.role === "assistant" && msg.content === "" && (
                 <span className="inline-flex gap-1">
-                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                 </span>
               )}
               {msg.hasDisclaimer && (
@@ -165,19 +165,19 @@ export default function ChatInterface({ ticker, market, token }: ChatInterfacePr
       </div>
 
       {/* 입력창 */}
-      <form onSubmit={sendMessage} className="p-4 border-t border-gray-200 flex gap-2">
+      <form onSubmit={sendMessage} className="p-4 border-t border-white/10 flex gap-2">
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={streaming}
           placeholder="질문을 입력하세요..."
-          className="flex-1 px-4 py-2 border border-gray-300 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+          className="flex-1 px-4 py-2 bg-white/10 border border-white/20 text-slate-50 placeholder:text-slate-500 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 disabled:opacity-50 transition-colors"
         />
         <button
           type="submit"
           disabled={streaming || !input.trim()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-full text-sm hover:bg-blue-700 disabled:opacity-50"
+          className="px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-500 text-white rounded-full text-sm hover:from-purple-500 hover:to-blue-400 disabled:opacity-50 transition-all"
         >
           전송
         </button>
