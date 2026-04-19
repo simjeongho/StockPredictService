@@ -11,13 +11,13 @@ export const DISCLAIMER_TEXT =
 export default function Disclaimer({ variant = "default" }: DisclaimerProps) {
   if (variant === "compact") {
     return (
-      <p className="text-xs text-gray-400 mt-2">⚠️ {DISCLAIMER_TEXT}</p>
+      <p className="text-xs text-amber-400/70 mt-2">⚠️ {DISCLAIMER_TEXT}</p>
     );
   }
 
   return (
-    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-      <p className="text-sm text-yellow-800">
+    <div className="mt-4 p-3 bg-amber-950/30 border border-amber-400/20 rounded-xl">
+      <p className="text-sm text-amber-300">
         <span className="font-semibold">⚠️ 투자 유의사항</span>
         <br />
         {DISCLAIMER_TEXT}
