@@ -4,27 +4,44 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import StockChart from "@/components/StockChart";
+import type { CandleType } from "@/components/StockChart";
 import ScoreGauge from "@/components/ScoreGauge";
 import Disclaimer from "@/components/Disclaimer";
-import { getPrice, getIndicators, addWatchlist, removeWatchlist } from "@/services/api";
+import { getPrice, getIndicators, addWatchlist, removeWatchlist, getTodayScore, resetAnalysisUsage } from "@/services/api";
 import type { PriceResponse, IndicatorsData, BuyScore, AnalysisEvent } from "@/types";
 
-type Period = "1m" | "3m" | "6m" | "1y";
+type Period = "1y" | "3y" | "5y";
 
 function cleanAiText(text: string): string {
   return text
-    .replace(/```json[\s\S]*?```/g, "")
+    .replace(/```json[\s\S]*?```/g, "")   // 완전한 JSON 블록 제거
+    .replace(/^```json[\s\S]*/m, "")       // 스트리밍 중 앞부분 미완성 JSON 블록 제거
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function downloadReport(ticker: string, market: string, aiText: string, buyScore: BuyScore | null) {
+  const scoreSection = buyScore
+    ? `## 예측 점수\n\n| 기간 | 점수 | 평가 |\n|------|------|------|\n| ${buyScore.short_term.period} | ${buyScore.short_term.score} | ${buyScore.short_term.label} |\n| ${buyScore.mid_term.period} | ${buyScore.mid_term.score} | ${buyScore.mid_term.label} |\n| ${buyScore.long_term.period} | ${buyScore.long_term.score} | ${buyScore.long_term.label} |\n\n`
+    : "";
+  const md = `# ${ticker.toUpperCase()} 기술적 분석 리포트\n\n**시장**: ${market.toUpperCase()}  \n**생성일**: ${new Date().toLocaleDateString("ko-KR")}\n\n${scoreSection}## 분석 내용\n\n${aiText}\n\n---\n*본 분석은 Claude AI가 생성한 참고 자료이며, 투자 조언이 아닙니다. 투자 결정은 본인의 판단과 책임 하에 이루어져야 합니다.*\n`;
+  const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${ticker.toUpperCase()}-analysis-${new Date().toISOString().slice(0, 10)}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function StockDetailPage() {
   const { ticker } = useParams<{ ticker: string }>();
   const searchParams = useSearchParams();
   const market = (searchParams.get("market") as "us" | "kr") ?? "us";
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
 
-  const [period, setPeriod] = useState<Period>("1m");
+  const [period, setPeriod] = useState<Period>("1y");
+  const [candleType, setCandleType] = useState<CandleType>("daily");
   const [priceData, setPriceData] = useState<PriceResponse | null>(null);
   const [indicators, setIndicators] = useState<IndicatorsData | null>(null);
   const [loadingPrice, setLoadingPrice] = useState(true);
@@ -33,6 +50,7 @@ export default function StockDetailPage() {
   const [buyScore, setBuyScore] = useState<BuyScore | null>(null);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [isCached, setIsCached] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
 
   const loadPrice = useCallback(async () => {
     setLoadingPrice(true);
@@ -54,11 +72,29 @@ export default function StockDetailPage() {
     loadPrice();
   }, [loadPrice]);
 
+  // 페이지 진입 시 오늘 분석 결과 자동 로드 (로그인 사용자만)
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    const token = (session as { accessToken?: string })?.accessToken ?? "";
+    if (!token) return;
+    getTodayScore(token, ticker, market).then((score) => {
+      if (!score || score.buy_score_short === null) return;
+      setAiText(score.analysis_text);
+      setBuyScore({
+        short_term: { period: "1주", score: score.buy_score_short!, label: score.buy_score_short_label! },
+        mid_term: { period: "3개월", score: score.buy_score_mid!, label: score.buy_score_mid_label! },
+        long_term: { period: "1년", score: score.buy_score_long!, label: score.buy_score_long_label! },
+      });
+      setIsCached(true);
+    });
+  }, [session, status, ticker, market]);
+
   const requestAnalysis = async () => {
     setLoadingAI(true);
     setAiText("");
     setBuyScore(null);
     setIsCached(false);
+    setSaveStatus("idle");
 
     const token = (session as { accessToken?: string })?.accessToken ?? "";
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -70,7 +106,7 @@ export default function StockDetailPage() {
         {
           method: "POST",
           headers,
-          body: JSON.stringify({ ticker, market, period }),
+          body: JSON.stringify({ ticker, market, period: "1y" }),
         }
       );
 
@@ -102,6 +138,10 @@ export default function StockDetailPage() {
               setAiText((prev) => prev + event.text);
             } else if (event.type === "score" && event.score) {
               setBuyScore(event.score);
+            } else if (event.type === "saved") {
+              setSaveStatus("saved");
+            } else if (event.type === "save_error") {
+              setSaveStatus("error");
             }
           } catch {
             // JSON 파싱 오류 무시
@@ -131,6 +171,19 @@ export default function StockDetailPage() {
       }
     } catch {
       alert("관심 종목 변경에 실패했습니다.");
+    }
+  };
+
+  const adminEmail = "simjeongho012@gmail.com";
+  const isAdmin = (session as { user?: { email?: string } })?.user?.email === adminEmail;
+
+  const handleResetUsage = async () => {
+    const token = (session as { accessToken?: string })?.accessToken ?? "";
+    try {
+      await resetAnalysisUsage(token, ticker, market);
+      alert(`${ticker.toUpperCase()} 분석 횟수가 초기화되었습니다.`);
+    } catch {
+      alert("횟수 초기화에 실패했습니다.");
     }
   };
 
@@ -182,10 +235,11 @@ export default function StockDetailPage() {
         </div>
       </div>
 
-      {/* 차트 */}
+      {/* 차트 A — 기간 선택 차트 */}
       <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
+        <h2 className="text-sm font-medium text-slate-400 mb-3">기간별 추세</h2>
         <div className="flex gap-2 mb-4">
-          {(["1m", "3m", "6m", "1y"] as Period[]).map((p) => (
+          {(["1y", "3y", "5y"] as Period[]).map((p) => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
@@ -195,7 +249,7 @@ export default function StockDetailPage() {
                   : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-300"
               }`}
             >
-              {p === "1m" ? "1개월" : p === "3m" ? "3개월" : p === "6m" ? "6개월" : "1년"}
+              {p === "1y" ? "1년" : p === "3y" ? "3년" : "5년"}
             </button>
           ))}
         </div>
@@ -204,7 +258,38 @@ export default function StockDetailPage() {
             차트 로딩 중...
           </div>
         ) : priceData ? (
-          <StockChart candles={priceData.candles} ticker={ticker} market={market} />
+          <StockChart candles={priceData.candles} ticker={ticker} market={market} candleType="daily" />
+        ) : (
+          <div className="h-[360px] flex items-center justify-center text-slate-500 text-sm">
+            차트 데이터를 불러올 수 없습니다.
+          </div>
+        )}
+      </div>
+
+      {/* 차트 B — 봉 타입 차트 */}
+      <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
+        <h2 className="text-sm font-medium text-slate-400 mb-3">봉 타입</h2>
+        <div className="flex gap-2 mb-4">
+          {(["daily", "weekly", "monthly"] as CandleType[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setCandleType(t)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                candleType === t
+                  ? "bg-gradient-to-r from-purple-600 to-blue-500 text-white shadow-md shadow-purple-500/20"
+                  : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-300"
+              }`}
+            >
+              {t === "daily" ? "일봉" : t === "weekly" ? "주봉" : "월봉"}
+            </button>
+          ))}
+        </div>
+        {loadingPrice ? (
+          <div className="h-[360px] flex items-center justify-center text-slate-500">
+            차트 로딩 중...
+          </div>
+        ) : priceData ? (
+          <StockChart candles={priceData.candles} ticker={ticker} market={market} candleType={candleType} />
         ) : (
           <div className="h-[360px] flex items-center justify-center text-slate-500 text-sm">
             차트 데이터를 불러올 수 없습니다.
@@ -257,15 +342,25 @@ export default function StockDetailPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-slate-50">AI 기술적 분석</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Claude AI · 기술 지표 기반 분석</p>
+            <p className="text-xs text-slate-500 mt-0.5">Claude AI · 기술 지표 + 시장 이슈 종합 분석</p>
           </div>
-          <button
-            onClick={requestAnalysis}
-            disabled={loadingAI}
-            className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-500 hover:to-blue-400 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-all shadow-lg shadow-purple-500/20"
-          >
-            {loadingAI ? "분석 중..." : "AI 분석 요청"}
-          </button>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button
+                onClick={handleResetUsage}
+                className="px-3 py-2 rounded-xl text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-all"
+              >
+                횟수 초기화
+              </button>
+            )}
+            <button
+              onClick={requestAnalysis}
+              disabled={loadingAI}
+              className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-blue-500 hover:from-purple-500 hover:to-blue-400 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-all shadow-lg shadow-purple-500/20"
+            >
+              {loadingAI ? "분석 중..." : "AI 분석 요청"}
+            </button>
+          </div>
         </div>
 
         {/* 로딩 상태 */}
@@ -277,16 +372,28 @@ export default function StockDetailPage() {
               <span className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
             </div>
             <p className="text-sm text-slate-400 font-medium">Claude AI가 기술 지표를 분석 중입니다</p>
-            <p className="text-xs text-slate-600">최신 시장 데이터를 수집하고 있습니다. 최대 2분 소요될 수 있습니다.</p>
+            <p className="text-xs text-slate-600">시장 이슈 및 최신 데이터를 수집하고 있습니다. 최대 2분 소요될 수 있습니다.</p>
           </div>
         )}
 
-        {/* 캐시 배지 */}
-        {isCached && (
-          <div className="mb-3 flex items-center gap-2">
-            <span className="text-xs px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20 font-medium">
-              캐시된 분석 결과
-            </span>
+        {/* 오늘 저장된 분석 / 캐시 배지 + 저장 상태 */}
+        {(isCached || saveStatus !== "idle") && (
+          <div className="mb-3 flex items-center gap-2 flex-wrap">
+            {isCached && (
+              <span className="text-xs px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20 font-medium">
+                오늘 분석 결과
+              </span>
+            )}
+            {saveStatus === "saved" && (
+              <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-medium">
+                ✓ 분석 기록 저장됨
+              </span>
+            )}
+            {saveStatus === "error" && (
+              <span className="text-xs px-2.5 py-1 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/20 font-medium">
+                ✗ 저장 실패 (로그인 확인)
+              </span>
+            )}
           </div>
         )}
 
@@ -304,8 +411,16 @@ export default function StockDetailPage() {
         )}
 
         {(displayText || buyScore) && (
-          <div className="mt-4">
+          <div className="mt-4 space-y-3">
             <Disclaimer />
+            {!loadingAI && displayText && (
+              <button
+                onClick={() => downloadReport(ticker, market, displayText, buyScore)}
+                className="px-4 py-2 rounded-xl text-sm font-medium bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10 transition-all"
+              >
+                리포트 다운로드 (.md)
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -9,6 +9,9 @@ import type {
   ScoreRankingItem,
   ScoreRankingResponse,
   UserProfile,
+  HistoryItem,
+  HistoryDetail,
+  MarketUsage,
 } from "@/types";
 
 const api = axios.create({
@@ -41,7 +44,7 @@ export async function searchStocks(
 
 export async function getPrice(
   ticker: string,
-  period: "1m" | "3m" | "6m" | "1y" = "1m"
+  period: "1m" | "3m" | "6m" | "1y" | "3y" | "5y" = "1y"
 ): Promise<PriceResponse> {
   const { data } = await api.get(`/api/v1/stocks/${ticker}/price`, {
     params: { period },
@@ -146,6 +149,66 @@ export async function deleteMe(token: string): Promise<void> {
   await api.delete("/api/v1/users/me", {
     headers: { Authorization: `Bearer ${token}` },
   });
+}
+
+// ─── 분석 기록 ───────────────────────────────────────────────
+
+export async function getHistory(token: string, skip = 0, limit = 20): Promise<HistoryItem[]> {
+  const { data } = await api.get("/api/v1/history", {
+    params: { skip, limit },
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
+export async function getHistoryDetail(token: string, id: number): Promise<HistoryDetail> {
+  const { data } = await api.get(`/api/v1/history/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return data;
+}
+
+export async function getTodayScore(
+  token: string,
+  ticker: string,
+  market: string
+): Promise<HistoryDetail | null> {
+  try {
+    const { data } = await api.get("/api/v1/history/today", {
+      params: { ticker, market },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+// ─── 시장 이슈 ───────────────────────────────────────────────
+
+export async function getMarketIssuesUsage(token: string): Promise<MarketUsage> {
+  const { data } = await api.get("/api/v1/market/issues/usage", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  return data;
+}
+
+// ─── 관리자 ──────────────────────────────────────────────────
+
+export async function resetAnalysisUsage(
+  token: string,
+  ticker: string,
+  market: string
+): Promise<{ message: string }> {
+  const { data } = await api.post(
+    "/api/v1/admin/usage/reset",
+    null,
+    {
+      params: { ticker, market },
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+  return data;
 }
 
 export default api;

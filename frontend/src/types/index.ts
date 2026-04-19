@@ -76,7 +76,7 @@ export interface BuyScore {
 
 // SSE 스트리밍 이벤트
 export interface AnalysisEvent {
-  type: "text" | "score" | "disclaimer" | "cached" | "out_of_scope" | "done";
+  type: "text" | "score" | "disclaimer" | "cached" | "out_of_scope" | "done" | "saved" | "save_error";
   text?: string;
   score?: BuyScore;
   disclaimer?: string;
@@ -148,6 +148,40 @@ export interface UserProfile {
 export interface ApiError {
   error: string;
   message: string;
+}
+
+// 분석 기록 아이템
+export interface HistoryItem {
+  id: number;
+  ticker: string;
+  market: "us" | "kr";
+  buy_score_short: number | null;
+  buy_score_short_label: string | null;
+  buy_score_mid: number | null;
+  buy_score_mid_label: string | null;
+  buy_score_long: number | null;
+  buy_score_long_label: string | null;
+  analysis_type: "stock" | "comparison";
+  tickers_json: string | null;
+  created_at: string;
+}
+
+// 분석 기록 상세
+export interface HistoryDetail extends HistoryItem {
+  analysis_text: string;
+}
+
+// 비교 분석 이벤트
+export interface ComparisonEvent {
+  type: "text" | "error" | "disclaimer" | "done" | "saved" | "save_error";
+  text?: string;
+  disclaimer?: string;
+}
+
+// 시장 이슈 사용량
+export interface MarketUsage {
+  used: number;
+  limit: number;
 }
 
 // 점수 라벨 색상 매핑
