@@ -7,7 +7,7 @@ import StockChart from "@/components/StockChart";
 import type { CandleType } from "@/components/StockChart";
 import ScoreGauge from "@/components/ScoreGauge";
 import Disclaimer from "@/components/Disclaimer";
-import { getPrice, getIndicators, addWatchlist, removeWatchlist, getTodayScore, resetAnalysisUsage } from "@/services/api";
+import { getPrice, getIndicators, addWatchlist, removeWatchlist, getLatestScore, resetAnalysisUsage } from "@/services/api";
 import type { PriceResponse, IndicatorsData, BuyScore, AnalysisEvent } from "@/types";
 
 type Period = "1y" | "3y" | "5y";
@@ -49,8 +49,9 @@ export default function StockDetailPage() {
   const [aiText, setAiText] = useState("");
   const [buyScore, setBuyScore] = useState<BuyScore | null>(null);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
-  const [isCached, setIsCached] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
+  const [analyzedAt, setAnalyzedAt] = useState<string | null>(null);
+  const [historyChecked, setHistoryChecked] = useState(false);
 
   const loadPrice = useCallback(async () => {
     setLoadingPrice(true);
@@ -72,12 +73,13 @@ export default function StockDetailPage() {
     loadPrice();
   }, [loadPrice]);
 
-  // 페이지 진입 시 오늘 분석 결과 자동 로드 (로그인 사용자만)
+  // 페이지 진입 시 가장 최근 분석 결과 자동 로드 (로그인 사용자만)
   useEffect(() => {
     if (status !== "authenticated") return;
     const token = (session as { accessToken?: string })?.accessToken ?? "";
     if (!token) return;
-    getTodayScore(token, ticker, market).then((score) => {
+    getLatestScore(token, ticker, market).then((score) => {
+      setHistoryChecked(true);
       if (!score || score.buy_score_short === null) return;
       setAiText(score.analysis_text);
       setBuyScore({
@@ -85,7 +87,7 @@ export default function StockDetailPage() {
         mid_term: { period: "3개월", score: score.buy_score_mid!, label: score.buy_score_mid_label! },
         long_term: { period: "1년", score: score.buy_score_long!, label: score.buy_score_long_label! },
       });
-      setIsCached(true);
+      setAnalyzedAt(score.created_at);
     });
   }, [session, status, ticker, market]);
 
@@ -93,7 +95,6 @@ export default function StockDetailPage() {
     setLoadingAI(true);
     setAiText("");
     setBuyScore(null);
-    setIsCached(false);
     setSaveStatus("idle");
 
     const token = (session as { accessToken?: string })?.accessToken ?? "";
@@ -132,14 +133,13 @@ export default function StockDetailPage() {
           if (payload === "[DONE]") break;
           try {
             const event: AnalysisEvent = JSON.parse(payload);
-            if (event.type === "cached") {
-              setIsCached(true);
-            } else if (event.type === "text" && event.text) {
+            if (event.type === "text" && event.text) {
               setAiText((prev) => prev + event.text);
             } else if (event.type === "score" && event.score) {
               setBuyScore(event.score);
             } else if (event.type === "saved") {
               setSaveStatus("saved");
+              setAnalyzedAt(new Date().toISOString());
             } else if (event.type === "save_error") {
               setSaveStatus("error");
             }
@@ -191,11 +191,18 @@ export default function StockDetailPage() {
   const staleData = priceData?.market_status === "closed" || priceData?.market_status === "holiday";
   const displayText = cleanAiText(aiText);
 
+  const formatAnalyzedAt = (iso: string): string => {
+    const d = new Date(iso);
+    const kst = new Date(d.getTime() + (d.getTimezoneOffset() + 9 * 60) * 60000);
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${kst.getFullYear()}-${pad(kst.getMonth() + 1)}-${pad(kst.getDate())} ${pad(kst.getHours())}:${pad(kst.getMinutes())}`;
+  };
+
   return (
     <div className="space-y-6">
       {/* 종목 헤더 */}
-      <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
-        <div className="flex items-start justify-between">
+      <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <h1 className="text-2xl font-bold text-slate-50">{ticker.toUpperCase()}</h1>
             <p className="text-slate-400 text-sm">{market.toUpperCase()}</p>
@@ -338,13 +345,13 @@ export default function StockDetailPage() {
       )}
 
       {/* AI 분석 */}
-      <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-5 sm:p-6">
+        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
           <div>
             <h2 className="text-lg font-semibold text-slate-50">AI 기술적 분석</h2>
             <p className="text-xs text-slate-500 mt-0.5">Claude AI · 기술 지표 + 시장 이슈 종합 분석</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {isAdmin && (
               <button
                 onClick={handleResetUsage}
@@ -376,12 +383,12 @@ export default function StockDetailPage() {
           </div>
         )}
 
-        {/* 오늘 저장된 분석 / 캐시 배지 + 저장 상태 */}
-        {(isCached || saveStatus !== "idle") && (
+        {/* 최근 분석 / 캐시 배지 + 저장 상태 */}
+        {(analyzedAt || saveStatus !== "idle") && (
           <div className="mb-3 flex items-center gap-2 flex-wrap">
-            {isCached && (
+            {analyzedAt && (
               <span className="text-xs px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20 font-medium">
-                오늘 분석 결과
+                최근 분석: {formatAnalyzedAt(analyzedAt)} KST
               </span>
             )}
             {saveStatus === "saved" && (
@@ -394,6 +401,14 @@ export default function StockDetailPage() {
                 ✗ 저장 실패 (로그인 확인)
               </span>
             )}
+          </div>
+        )}
+
+        {/* 기록 없음 플레이스홀더 */}
+        {status === "authenticated" && historyChecked && !buyScore && !loadingAI && !aiText && (
+          <div className="mb-3 p-5 bg-white/[0.03] border border-dashed border-white/10 rounded-xl text-center">
+            <p className="text-sm text-slate-500">아직 분석된 기록이 없습니다.</p>
+            <p className="text-xs text-slate-600 mt-1">위 &ldquo;AI 분석 요청&rdquo; 버튼을 눌러 분석을 시작하세요.</p>
           </div>
         )}
 

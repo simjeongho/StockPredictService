@@ -1,8 +1,12 @@
-# 주가 예측 웹 애플리케이션 Development Guidelines
+﻿# 주가 예측 웹 애플리케이션 Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-15
+Auto-generated from all feature plans. Last updated: 2026-04-19
 
 ## Active Technologies
+- TypeScript 5.x (Next.js 14 App Router) + Next.js 14, React 18, Tailwind CSS 3, NextAuth.js v5, Axios (002-ui-redesign)
+- N/A (백엔드 API 변경 없음) (002-ui-redesign)
+- TypeScript 5.x / Next.js 14 App Router (프론트), Python 3.11 (백엔드 테스트) + Next.js 14, React 18, Tailwind CSS 3, NextAuth.js v5, Axios, pytest, httpx (002-ui-redesign)
+- PostgreSQL (기존, 변경 없음) (002-ui-redesign)
 
 **Backend**: Python 3.11+, FastAPI, Uvicorn, SQLAlchemy[asyncio], asyncpg, Alembic, slowapi, anthropic SDK, yfinance, FinanceDataReader, pandas, pandas_ta, PyJWT, httpx, python-dotenv
 
@@ -105,9 +109,10 @@ docker run -p 8000:8000 --env-file .env stock-backend
 - **Markets**: US (NASDAQ/S&P500) primary via yfinance, KOSPI secondary via FinanceDataReader
 
 ## Recent Changes
+- 002-ui-redesign: Added TypeScript 5.x / Next.js 14 App Router (프론트), Python 3.11 (백엔드 테스트) + Next.js 14, React 18, Tailwind CSS 3, NextAuth.js v5, Axios, pytest, httpx
+- 002-ui-redesign: Added TypeScript 5.x (Next.js 14 App Router) + Next.js 14, React 18, Tailwind CSS 3, NextAuth.js v5, Axios
 
 - **001-stock-prediction-app** (2026-04-15): Initial feature — full app spec, plan, data model, API contracts, quickstart
-- **001-stock-prediction-app** (2026-04-15): Amendment — add FR-020 account deletion (DELETE /api/v1/users/me), resolve Constitution §Data&Privacy violation; tasks T060–T063 added
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

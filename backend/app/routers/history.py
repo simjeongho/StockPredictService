@@ -46,6 +46,29 @@ async def get_today_score(
     return HistoryDetail.model_validate(record) if record else None
 
 
+@router.get("/latest", response_model=HistoryDetail | None)
+async def get_latest_score(
+    ticker: str = Query(...),
+    market: str = Query("us"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """날짜 무관 해당 종목의 가장 최근 stock 분석 결과 반환. 없으면 null."""
+    result = await db.execute(
+        select(AnalysisHistory)
+        .where(
+            AnalysisHistory.user_id == current_user.id,
+            AnalysisHistory.ticker == ticker.upper(),
+            AnalysisHistory.market == market,
+            AnalysisHistory.analysis_type == "stock",
+        )
+        .order_by(desc(AnalysisHistory.created_at))
+        .limit(1)
+    )
+    record = result.scalar_one_or_none()
+    return HistoryDetail.model_validate(record) if record else None
+
+
 @router.get("", response_model=list[HistoryItem])
 async def get_history(
     skip: int = 0,

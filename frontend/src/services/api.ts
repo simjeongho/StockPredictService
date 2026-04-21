@@ -184,6 +184,22 @@ export async function getTodayScore(
   }
 }
 
+export async function getLatestScore(
+  token: string,
+  ticker: string,
+  market: string
+): Promise<HistoryDetail | null> {
+  try {
+    const { data } = await api.get("/api/v1/history/latest", {
+      params: { ticker, market },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 // ─── 시장 이슈 ───────────────────────────────────────────────
 
 export async function getMarketIssuesUsage(token: string): Promise<MarketUsage> {

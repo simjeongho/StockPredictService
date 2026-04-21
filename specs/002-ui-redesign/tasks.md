@@ -264,3 +264,193 @@ T018 (CORS 확인, backend/app/main.py)
 - **Scope Amendment**: T018, T019는 백엔드 파일 수정/생성, T020은 프론트엔드 수정
 - T019 실행 전 백엔드 서버가 `localhost:8000`에서 실행 중이어야 함
 - T020에서 `addWatchlist()`, `searchStocks()` 함수는 이미 `api.ts`에 구현되어 있음 — 신규 API 코드 작성 불필요
+
+---
+
+## Scope Amendment (2026-04-22): UX·비용·기능 개선 패키지 (5개 독립 트랙)
+
+> **추가 범위**: 모바일 반응형 / 프롬프트 토큰 절감 / history 행 클릭 / 차트 선 그리기 / 상세 페이지 최근 점수 노출  
+> **원칙**: 각 트랙은 독립 사용자 스토리. 기존 완료된 UI(T001~T021)를 깨뜨리지 않음. 데스크톱 경험 불변.
+
+### 사전 결정사항 (2단계에서 확정된 기본값)
+
+| 항목 | 채택안 | 근거 |
+|------|--------|------|
+| NAV 모바일 변환 | **햄버거 메뉴(상단 오버레이)** | 링크 7개 수용, 화면 상단 일관성, 구현 복잡도 낮음 |
+| 프롬프트 문구 | **"4문장 이내 지표 종합 서술 금지 규칙"** 추가 | 점수 산출은 유지, 서술만 압축 |
+| 차트 저장 정책 | **localStorage** (`chart_drawings_${ticker}_${market}`) | DB 스키마 무수정, 브라우저별 유지 |
+| 최근 점수 API | **신규 `GET /api/v1/history/latest?ticker=&market=`** | 기존 `/today`는 유지 |
+
+---
+
+## Phase 9: 사용자 스토리 5 — 모바일 반응형 UI (우선순위: P1) 🚨 Usability-Blocker
+
+**목표**: 모바일 뷰포트(< 640px)에서 NAV로 모든 페이지 이동 가능 + 주요 페이지 모바일 친화적 레이아웃
+
+**독립 테스트**:
+1. iPhone SE(375px)/일반 모바일(390px)에서 햄버거 아이콘 표시 → 탭 시 전체 메뉴 오픈 → 모든 링크 이동 가능
+2. 데스크톱(≥ 640px)에서 기존 NAV 레이아웃 **완전 동일** 유지
+3. `/dashboard`, `/history`, `/stock/[ticker]` 모바일에서 가로 스크롤 없이 주요 정보 확인 가능
+4. 모든 터치 대상이 최소 44×44px 확보
+
+### US-005 구현
+
+- [X] T022 [US5] `frontend/src/app/layout.tsx`에 viewport 메타 태그 추가 — `export const viewport: Viewport = { width: "device-width", initialScale: 1, maximumScale: 5 }`
+- [X] T023 [US5] `frontend/src/components/NavClient.tsx` 햄버거 메뉴 분기 구현 — 모바일(`sm:hidden`) 전용 햄버거 아이콘 + `useState`로 드로어 열기/닫기, 열린 상태일 때 상단 오버레이로 전체 링크 세로 배치, `pathname` 변경 시 자동 닫기, 바디 스크롤 잠금(`overflow-hidden`)
+- [X] T024 [US5] `NavClient.tsx` 데스크톱 링크 블록 보존 — 기존 `hidden sm:flex` 유지, 햄버거는 `sm:hidden`으로 분기 (데스크톱 경험 0 변화)
+- [X] T025 [P] [US5] `frontend/src/app/(main)/history/page.tsx` 모바일 대응 — 테이블을 `sm:table` 이하에서 카드 리스트로 전환 OR 가로 스크롤 컨테이너(`overflow-x-auto`) 추가, 행 패딩 터치 영역 확보
+- [X] T026 [P] [US5] `frontend/src/app/(main)/stock/[ticker]/page.tsx` 모바일 대응 — 차트 높이 모바일 `h-[280px]` 데스크톱 유지, AI 분석 버튼 그룹 `flex-wrap`, 지표 그리드 `grid-cols-2 sm:grid-cols-4` 유지 확인
+- [X] T027 [P] [US5] `frontend/src/app/(main)/dashboard/page.tsx` 모바일 점검 — 이미 `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3` 이므로 터치 영역 및 폰트 가독성만 확인
+
+**체크포인트**: 375px 뷰포트에서 햄버거로 모든 페이지 이동 가능 + 데스크톱 레이아웃 무변화
+
+---
+
+## Phase 10: 사용자 스토리 6 — Claude API 프롬프트 토큰 압축 (우선순위: P2)
+
+**목표**: 기술 지표 해설 부분을 4문장 이내 종합 서술로 압축하여 평균 출력 토큰 60-75% 절감
+
+**독립 테스트**:
+1. 동일 티커(예: AAPL) 3회 연속 분석 → 각 호출의 `usage.output_tokens` 로그 비교 → 이전 대비 60%+ 감소
+2. 분석 결과 본문에 "RSI는 ... MACD는 ... 볼린저밴드는 ..." 같은 지표별 나열 문구 없음
+3. 단기/중기/장기 점수(JSON 블록)는 여전히 정상 반환되어 `parse_scores()`가 파싱 성공
+
+### US-006 구현
+
+- [X] T028 [US6] `backend/app/services/claude.py` `SYSTEM_PROMPT` (L14-39)에 "기술 지표 해설 규칙" 섹션 추가 — "이동평균선·RSI·MACD·볼린저밴드·스토캐스틱을 지표별로 나열하지 말고, 모든 지표를 종합하여 현재 추세·모멘텀·변동성·매매 시그널을 총 4문장 이내로 서술하세요. 지표명은 언급 가능하나 '~는 ..., ~는 ...' 식 나열은 금지합니다." 추가. 점수 산출 JSON 블록 지시는 **변경 금지**.
+- [X] T029 [US6] `backend/app/services/claude.py` `stream_analysis()`에 토큰 사용량 로깅 추가 — `stream.get_final_message()` 또는 SDK 제공 방식으로 `usage.input_tokens`, `usage.output_tokens`, `usage.cache_read_input_tokens`를 `logger.info("Claude 토큰 사용: input=%d, output=%d, cache_read=%d, ticker=%s")` 형태로 기록
+- [ ] T030 [US6] 수동 검증 — AAPL, RKLB, TSLA 각 1회씩 분석 실행 후 로그에서 output_tokens 확인. 평균이 이전 대비 60%+ 감소했는지 확인. 감소가 부족하면 T028 규칙 문구 재조정 *(사용자 수동 실행 필요)*
+
+**Prompt Caching 영향 주석**: SYSTEM_PROMPT 본문 변경 시 `cache_control: ephemeral` 해시가 바뀌어 **첫 호출은 캐시 미스**(5분 TTL 재구축). 이후 호출은 다시 적중. 비용 영향은 5분 내 1회 재계산뿐.
+
+**체크포인트**: 신규 프롬프트로 분석 시 본문이 4문장 내 종합 서술 + 점수 정상 반환 + 토큰 감소 확인
+
+---
+
+## Phase 11: 사용자 스토리 7 — /history 행 전체 클릭 가능 (우선순위: P3)
+
+**목표**: 분석 기록 표의 행 어디를 클릭해도 상세 팝업이 열림
+
+**독립 테스트**:
+1. `/history`에서 행의 종목명·점수 배지·날짜 등 어느 셀을 클릭해도 상세 모달 오픈
+2. 기존 "자세히" 버튼 클릭도 여전히 동작
+3. 행 호버 시 배경색 변경(`hover:bg-white/5`) + 커서 포인터로 클릭 가능 힌트 제공
+4. "자세히" 버튼 클릭 시 이중 실행 없음 (stopPropagation 적용)
+
+### US-007 구현
+
+- [X] T031 [US7] `frontend/src/app/(main)/history/page.tsx` 행(`<tr>`) 수정 — `onClick={() => openDetail(item.id)}` 추가, `className`에 `cursor-pointer`와 기존 `hover:bg-white/5 transition-colors` 유지
+- [X] T032 [US7] `history/page.tsx` "자세히" 버튼 핸들러에 이벤트 버블링 차단 — `onClick={(e) => { e.stopPropagation(); openDetail(item.id); }}`
+
+**체크포인트**: 행 전체 클릭 가능 + 버튼 중복 호출 없음
+
+---
+
+## Phase 12: 사용자 스토리 8 — 차트 선 그리기 도구 (우선순위: P3)
+
+**목표**: 종목 상세 페이지 차트에서 추세선(2점 직선) + 수평 지지/저항선을 클릭으로 그리고 localStorage에 저장
+
+**독립 테스트**:
+1. 차트 상단 툴바에서 "그리기 모드 ON" 토글 → 차트 클릭 2회로 추세선 생성
+2. "수평선" 모드에서 1회 클릭으로 수평 지지/저항선 생성 (`createPriceLine()` 활용)
+3. "지우기" 버튼으로 모든 선 삭제
+4. 새로고침 후에도 해당 티커에 그렸던 선이 복원됨 (localStorage)
+5. 차트 리사이즈 시 선이 봉과 어긋나지 않음
+6. 그리기 모드 OFF 상태에서는 기존 크로스헤어·툴팁 정상 동작
+
+### US-008 구현
+
+- [X] T033 [US8] `frontend/src/components/StockChart.tsx` 드로잉 상태 추가 — `drawingMode: "off" | "trendline" | "hline"`, `pendingPoint: {time, price} | null`, `lines: DrawingLine[]` (TrendLine은 두 점, HLine은 가격 하나), useRef로 SVG 오버레이 참조
+- [X] T034 [US8] `StockChart.tsx` 툴바 UI — 차트 위쪽에 "추세선 / 수평선 / 지우기 / 모드 ON·OFF" 버튼 4개, 활성 모드 강조 스타일
+- [X] T035 [US8] `StockChart.tsx` SVG 오버레이 레이어 — `chartContainerRef` 위에 `position:absolute` SVG, 차트 canvas와 동일 크기, `pointer-events` 모드에 따라 토글, `chart.timeScale().timeToCoordinate()` + `candleSeries.priceToCoordinate()`로 좌표 변환, 추세선은 `<line>` 요소로 렌더
+- [X] T036 [US8] `StockChart.tsx` 클릭 핸들러 — 드로잉 모드 ON일 때 SVG `onClick`에서 `e.offsetX/Y` → `chart.timeScale().coordinateToTime()` + `candleSeries.coordinateToPrice()`로 논리 좌표 변환 → `trendline` 모드는 2번째 클릭에서 line 추가, `hline` 모드는 `candleSeries.createPriceLine({price, color, lineWidth, title})` 호출
+- [X] T037 [US8] `StockChart.tsx` localStorage 저장 — `lines` state 변경 시 `localStorage.setItem("chart_drawings_${ticker}_${market}", JSON.stringify(lines))`, 마운트 시 복원. 저장 포맷은 논리 좌표(time, price)만 — 렌더 시 좌표 변환 재수행 → 리사이즈 자동 대응
+- [X] T038 [US8] `StockChart.tsx` 리사이즈 대응 — 기존 `handleResize`에서 SVG 크기 업데이트 + 모든 선의 좌표 재계산 트리거 (state 의존 useEffect로 재렌더)
+
+**주의**: 기존 크로스헤어·툴팁 로직(L248-325) 보존. 드로잉 모드 OFF일 때 SVG `pointer-events:none`으로 기존 인터랙션 방해 금지.
+
+**체크포인트**: 2가지 선 그리기 + 저장/복원 + 리사이즈 무붕괴 + 기존 차트 기능 무손상
+
+---
+
+## Phase 13: 사용자 스토리 9 — 상세 페이지 최근 분석 점수·날짜 기본 노출 (우선순위: P2)
+
+**목표**: 개별 종목 상세 페이지의 AI 기술적 분석 Div 상단에 **가장 최근** 분석(날짜 무관)의 단기/중기/장기 점수 + 날짜를 기본 표시
+
+**독립 테스트**:
+1. RKLB 등 분석 기록 있는 종목 진입 → 페이지 로드 직후 단·중·장기 점수 + "YYYY-MM-DD HH:mm KST" 날짜 배지 표시
+2. 분석 기록 없는 종목(검색 후 첫 진입) → "아직 분석된 기록이 없습니다" 플레이스홀더
+3. 새 AI 분석 실행 후 → 해당 분석 점수로 UI 업데이트됨
+4. 오늘 기록이 없더라도 가장 최근 1건을 표시 (기존 `/today`와 동작 차이 확인)
+
+### US-009 구현
+
+- [X] T039 [US9] `backend/app/routers/history.py` 신규 엔드포인트 — `GET /api/v1/history/latest?ticker=&market=` — `analysis_type='stock'` 필터, `user_id` 일치, 날짜 무관 최신 1건을 `HistoryDetail`로 반환, 없으면 `null` (200 + null body)
+- [X] T040 [US9] `frontend/src/services/api.ts` `getLatestScore(token, ticker, market): Promise<HistoryDetail | null>` 신규 함수 추가 (실패 시 null 반환)
+- [X] T041 [US9] `frontend/src/app/(main)/stock/[ticker]/page.tsx` 수정 — 기존 `getTodayScore` 호출부를 `getLatestScore`로 교체, `analyzedAt: string | null` state 추가, 응답의 `created_at`을 KST `YYYY-MM-DD HH:mm` 포맷으로 배지 렌더 (예: "최근 분석: 2026-04-20 14:30"), `buyScore === null`일 때 AI 분석 Div 상단에 "아직 분석된 기록이 없습니다" 플레이스홀더
+- [X] T042 [US9] `stock/[ticker]/page.tsx` — 새 AI 분석 완료 후(`event.type === "saved"`) `analyzedAt`을 현재 시각으로 업데이트하여 배지 즉시 반영
+
+**체크포인트**: 기록 있는 종목에서 진입 즉시 최근 점수·날짜 표시 + 기록 없는 종목은 플레이스홀더
+
+---
+
+## Phase 14: 마무리 및 검증 (Scope Amendment)
+
+- [ ] T043 quickstart.md에 5트랙 검증 체크리스트 추가 — 모바일 NAV(375px) / 프롬프트 토큰 절감 / history 행 클릭 / 차트 그리기 / 최근 점수 표시 각 독립 테스트 항목
+- [ ] T044 데스크톱 회귀 테스트 — 1280px/1920px에서 기존 UI 변화 없음 확인, 기존 차트 크로스헤어·툴팁 정상, 기존 /history 버튼 정상
+- [ ] T045 모바일 실기 테스트 — 크롬 DevTools 디바이스 모드 iPhone SE/Pixel 5, 각 페이지 NAV·터치 영역 확인
+
+---
+
+## Scope Amendment 의존 관계
+
+```
+T022 (viewport 메타)
+  └─► T023 (NavClient 햄버거)
+        └─► T024 (데스크톱 보존)
+              └─► T025 [P] /history 모바일
+              └─► T026 [P] /stock 모바일
+              └─► T027 [P] /dashboard 점검
+
+T028 (프롬프트 수정)
+  └─► T029 (토큰 로깅) ← 병렬 가능
+        └─► T030 (수동 검증)
+
+T031 (행 onClick)
+  └─► T032 (버튼 stopPropagation)
+
+T033 (드로잉 state)
+  └─► T034 (툴바)
+        └─► T035 (SVG 오버레이)
+              └─► T036 (클릭 핸들러)
+                    └─► T037 (localStorage)
+                          └─► T038 (리사이즈 대응)
+
+T039 (backend /latest)
+  └─► T040 (api.ts getLatestScore)
+        └─► T041 (stock 페이지 연동)
+              └─► T042 (saved 이벤트 반영)
+
+T043~T045 (검증): 위 모든 트랙 완료 후
+```
+
+## Scope Amendment 병렬 실행 예시
+
+```
+개발자 A: US-005 모바일 (T022→T023→T024, 그 후 T025/T026/T027 병렬)
+개발자 B: US-006 프롬프트 (T028→T029→T030)
+개발자 C: US-007 history 클릭 (T031→T032) [매우 짧음]
+개발자 D: US-008 차트 그리기 (T033→...→T038) [가장 큰 작업]
+개발자 E: US-009 최근 점수 (T039→T040→T041→T042)
+
+5트랙 동시 진행 가능 — 파일 중복은 `stock/[ticker]/page.tsx`(US-008 StockChart 편집 없음,
+US-009만 수정)와 `NavClient.tsx`(US-005만)로 제한적
+```
+
+## Scope Amendment MVP 전략
+
+1. **먼저 US-005 (모바일 NAV)** — 모바일 사용자 **완전 블로킹** 이슈. 최우선 배포.
+2. 이어 **US-009 (최근 점수)** — 사용성 개선, 구현 경량.
+3. **US-007 (행 클릭)** — 10분 작업. 자투리로 처리.
+4. **US-006 (프롬프트)** — 비용 개선, 백엔드 수정만. 측정 필요.
+5. **US-008 (차트 그리기)** — 가장 큰 작업. 마지막 배포.
