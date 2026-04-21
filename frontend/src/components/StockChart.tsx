@@ -1,9 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import type { Candle } from "@/types";
 
 export type CandleType = "daily" | "weekly" | "monthly";
+
+type DrawingMode = "off" | "trendline" | "hline";
+
+interface TrendLineData {
+  kind: "trendline";
+  id: string;
+  p1: { time: string; price: number };
+  p2: { time: string; price: number };
+}
+
+interface HLineData {
+  kind: "hline";
+  id: string;
+  price: number;
+}
+
+type DrawingLine = TrendLineData | HLineData;
 
 interface StockChartProps {
   candles: Candle[];
@@ -43,7 +60,6 @@ function aggregateCandles(candles: Candle[], type: CandleType): Candle[] {
     }));
 }
 
-// n-기간 단순이동평균
 function computeSMA(candles: Candle[], period: number): { time: string; value: number }[] {
   const result: { time: string; value: number }[] = [];
   for (let i = period - 1; i < candles.length; i++) {
@@ -54,7 +70,6 @@ function computeSMA(candles: Candle[], period: number): { time: string; value: n
   return result;
 }
 
-// 볼린저 밴드 (period=20, 표준편차 배수=2)
 function computeBollinger(candles: Candle[], period = 20, stdMult = 2) {
   const upper: { time: string; value: number }[] = [];
   const middle: { time: string; value: number }[] = [];
@@ -73,7 +88,6 @@ function computeBollinger(candles: Candle[], period = 20, stdMult = 2) {
   return { upper, middle, lower };
 }
 
-// Wilder's RSI (14기간)
 function computeRSI(candles: Candle[], period = 14): { time: string; value: number }[] {
   const result: { time: string; value: number }[] = [];
   if (candles.length < period + 1) return result;
@@ -106,21 +120,67 @@ const MA_CONFIGS = [
   { period: 200, color: "#8B5CF6", label: "MA200" },
 ];
 
+const CHART_HEIGHT = 360;
+
+function storageKey(ticker: string, market: string) {
+  return `chart_drawings_${ticker.toUpperCase()}_${market}`;
+}
+
+function loadLines(ticker: string, market: string): DrawingLine[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(storageKey(ticker, market));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLines(ticker: string, market: string, lines: DrawingLine[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(storageKey(ticker, market), JSON.stringify(lines));
+  } catch {
+    // storage full or disabled
+  }
+}
+
 export default function StockChart({ candles, ticker, market = "us", candleType = "daily" }: StockChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chartRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const candleSeriesRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const priceLinesRef = useRef<Map<string, any>>(new Map());
+
+  const [drawingMode, setDrawingMode] = useState<DrawingMode>("off");
+  const [pendingPoint, setPendingPoint] = useState<{ time: string; price: number; x: number; y: number } | null>(null);
+  const [lines, setLines] = useState<DrawingLine[]>(() => loadLines(ticker, market));
+  const [renderTick, setRenderTick] = useState(0);
 
   const displayCandles = useMemo(() => aggregateCandles(candles, candleType), [candles, candleType]);
 
   useEffect(() => {
+    setLines(loadLines(ticker, market));
+    setPendingPoint(null);
+  }, [ticker, market]);
+
+  useEffect(() => {
+    saveLines(ticker, market, lines);
+  }, [ticker, market, lines]);
+
+  useEffect(() => {
     if (!chartContainerRef.current || displayCandles.length === 0) return;
 
-    // unmounted 플래그: async import 완료 전에 cleanup이 실행되면 chart 생성 자체를 막음
     let unmounted = false;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let chart: any = null;
 
-    // 미리 계산 (시간 → 값 Map으로 변환해 O(1) 조회)
     const rsiData = computeRSI(displayCandles, 14);
     const rsiMap = new Map(rsiData.map((d) => [d.time, d.value]));
 
@@ -135,10 +195,10 @@ export default function StockChart({ candles, ticker, market = "us", candleType 
         ? v.toLocaleString("ko-KR", { maximumFractionDigits: 0 })
         : v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    // 반응형 리사이즈 — cleanup에서 정확히 제거할 수 있도록 async 블록 바깥에 정의
     const handleResize = () => {
       if (chart && chartContainerRef.current) {
         chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+        setRenderTick((n) => n + 1);
       }
     };
     window.addEventListener("resize", handleResize);
@@ -152,7 +212,7 @@ export default function StockChart({ candles, ticker, market = "us", candleType 
           textColor: "#94A3B8",
         },
         width: chartContainerRef.current.clientWidth,
-        height: 360,
+        height: CHART_HEIGHT,
         grid: {
           vertLines: { color: "#1e293b" },
           horzLines: { color: "#1e293b" },
@@ -164,8 +224,8 @@ export default function StockChart({ candles, ticker, market = "us", candleType 
           horzLine: { color: "#475569", width: 1 },
         },
       });
+      chartRef.current = chart;
 
-      // 캔들스틱
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const candleSeries: any = chart.addCandlestickSeries({
         upColor: "#22c55e",
@@ -183,8 +243,8 @@ export default function StockChart({ candles, ticker, market = "us", candleType 
           close: c.close,
         }))
       );
+      candleSeriesRef.current = candleSeries;
 
-      // 이동평균선
       for (const { period, color } of MA_CONFIGS) {
         if (displayCandles.length < period) continue;
         const maData = computeSMA(displayCandles, period);
@@ -203,14 +263,8 @@ export default function StockChart({ candles, ticker, market = "us", candleType 
         );
       }
 
-      // 볼린저 밴드 (상단/하단 — 중간은 MA20과 동일)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let bbUpperSeries: any = null;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let bbLowerSeries: any = null;
-
       if (displayCandles.length >= 20) {
-        bbUpperSeries = chart.addLineSeries({
+        const bbUpperSeries = chart.addLineSeries({
           color: "#22d3ee",
           lineWidth: 1,
           lineStyle: 1,
@@ -225,7 +279,7 @@ export default function StockChart({ candles, ticker, market = "us", candleType 
           }))
         );
 
-        bbLowerSeries = chart.addLineSeries({
+        const bbLowerSeries = chart.addLineSeries({
           color: "#22d3ee",
           lineWidth: 1,
           lineStyle: 1,
@@ -243,14 +297,20 @@ export default function StockChart({ candles, ticker, market = "us", candleType 
 
       chart.timeScale().fitContent();
 
-      // ─── crosshairMove 툴팁 ───────────────────────────────────────
+      // 저장된 선 복원 → SVG 재렌더 트리거
+      setRenderTick((n) => n + 1);
+
+      // 시간 범위 변동 시 재렌더
+      chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+        setRenderTick((n) => n + 1);
+      });
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       chart.subscribeCrosshairMove((param: any) => {
         const tip = tooltipRef.current;
         const container = chartContainerRef.current;
         if (!tip || !container) return;
 
-        // 유효하지 않은 포지션이면 숨김
         if (
           !param.time ||
           !param.point ||
@@ -263,14 +323,12 @@ export default function StockChart({ candles, ticker, market = "us", candleType 
           return;
         }
 
-        // 캔들 데이터
         const candle = param.seriesData.get(candleSeries);
         if (!candle || candle.open === undefined) {
           tip.style.display = "none";
           return;
         }
 
-        // 시간 문자열
         const timeStr =
           typeof param.time === "string"
             ? param.time
@@ -307,7 +365,6 @@ export default function StockChart({ candles, ticker, market = "us", candleType 
           ${rsi !== undefined ? `${divider}${row("RSI(14)", rsi.toFixed(1), rsi > 70 ? "#ef4444" : rsi < 30 ? "#22c55e" : "#f59e0b")}` : ""}
         `;
 
-        // 툴팁 위치 — 오른쪽 공간 없으면 왼쪽으로
         tip.style.display = "block";
         const tw = tip.offsetWidth || 190;
         const th = tip.offsetHeight || 160;
@@ -323,31 +380,222 @@ export default function StockChart({ candles, ticker, market = "us", candleType 
         tip.style.left = `${left}px`;
         tip.style.top = `${top}px`;
       });
-
     });
 
     return () => {
       unmounted = true;
       window.removeEventListener("resize", handleResize);
+      priceLinesRef.current.clear();
       chart?.remove();
-      chart = null;
+      chartRef.current = null;
+      candleSeriesRef.current = null;
     };
   }, [displayCandles, ticker, market]);
+
+  // 수평선(price lines) 동기화 — lightweight-charts의 createPriceLine 사용
+  useEffect(() => {
+    const cs = candleSeriesRef.current;
+    if (!cs) return;
+    const current = priceLinesRef.current;
+    const nextIds = new Set(lines.filter((l) => l.kind === "hline").map((l) => l.id));
+
+    // 제거된 선 삭제
+    for (const [id, pl] of Array.from(current.entries())) {
+      if (!nextIds.has(id)) {
+        try { cs.removePriceLine(pl); } catch { /* noop */ }
+        current.delete(id);
+      }
+    }
+    // 신규 선 추가
+    for (const l of lines) {
+      if (l.kind !== "hline" || current.has(l.id)) continue;
+      try {
+        const pl = cs.createPriceLine({
+          price: l.price,
+          color: "#f97316",
+          lineWidth: 1,
+          lineStyle: 2,
+          axisLabelVisible: true,
+          title: "",
+        });
+        current.set(l.id, pl);
+      } catch { /* noop */ }
+    }
+  }, [lines, renderTick]);
+
+  // 추세선 → SVG 좌표 변환
+  const trendlineSegments = useMemo(() => {
+    const chart = chartRef.current;
+    const cs = candleSeriesRef.current;
+    if (!chart || !cs) return [];
+    type Seg = { id: string; x1: number; y1: number; x2: number; y2: number };
+    const segs: Seg[] = [];
+    for (const l of lines) {
+      if (l.kind !== "trendline") continue;
+      const x1 = chart.timeScale().timeToCoordinate(l.p1.time as `${number}-${number}-${number}`);
+      const x2 = chart.timeScale().timeToCoordinate(l.p2.time as `${number}-${number}-${number}`);
+      const y1 = cs.priceToCoordinate(l.p1.price);
+      const y2 = cs.priceToCoordinate(l.p2.price);
+      if (x1 != null && x2 != null && y1 != null && y2 != null) {
+        segs.push({ id: l.id, x1, y1, x2, y2 });
+      }
+    }
+    return segs;
+  }, [lines, renderTick, displayCandles]);
+
+  const handleChartClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (drawingMode === "off") return;
+    const chart = chartRef.current;
+    const cs = candleSeriesRef.current;
+    const container = chartContainerRef.current;
+    if (!chart || !cs || !container) return;
+
+    const rect = container.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const time = chart.timeScale().coordinateToTime(x);
+    const price = cs.coordinateToPrice(y);
+    if (time == null || price == null) return;
+
+    const timeStr =
+      typeof time === "string"
+        ? time
+        : typeof time === "number"
+        ? new Date(time * 1000).toISOString().slice(0, 10)
+        : String(time);
+
+    if (drawingMode === "hline") {
+      const newLine: HLineData = {
+        kind: "hline",
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        price: Number(price),
+      };
+      setLines((prev) => [...prev, newLine]);
+      return;
+    }
+
+    if (drawingMode === "trendline") {
+      if (!pendingPoint) {
+        setPendingPoint({ time: timeStr, price: Number(price), x, y });
+      } else {
+        const newLine: TrendLineData = {
+          kind: "trendline",
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          p1: { time: pendingPoint.time, price: pendingPoint.price },
+          p2: { time: timeStr, price: Number(price) },
+        };
+        setLines((prev) => [...prev, newLine]);
+        setPendingPoint(null);
+      }
+    }
+  }, [drawingMode, pendingPoint]);
+
+  const clearAll = () => {
+    setLines([]);
+    setPendingPoint(null);
+  };
+
+  const setMode = (m: DrawingMode) => {
+    setDrawingMode(m);
+    setPendingPoint(null);
+  };
 
   const visibleMAs = MA_CONFIGS.filter((m) => displayCandles.length >= m.period);
   const showBollinger = displayCandles.length >= 20;
 
+  const svgInteractive = drawingMode !== "off";
+
   return (
     <div className="space-y-3">
-      {/* 차트 + 툴팁 컨테이너 */}
+      {/* 드로잉 툴바 */}
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-slate-500 mr-1">그리기:</span>
+        <button
+          onClick={() => setMode(drawingMode === "trendline" ? "off" : "trendline")}
+          className={`px-2.5 py-1 rounded-lg border transition-colors ${
+            drawingMode === "trendline"
+              ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+              : "bg-white/5 text-slate-400 border-white/10 hover:bg-white/10"
+          }`}
+        >
+          추세선
+        </button>
+        <button
+          onClick={() => setMode(drawingMode === "hline" ? "off" : "hline")}
+          className={`px-2.5 py-1 rounded-lg border transition-colors ${
+            drawingMode === "hline"
+              ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+              : "bg-white/5 text-slate-400 border-white/10 hover:bg-white/10"
+          }`}
+        >
+          수평선
+        </button>
+        <button
+          onClick={() => setMode("off")}
+          className={`px-2.5 py-1 rounded-lg border transition-colors ${
+            drawingMode === "off"
+              ? "bg-white/10 text-slate-200 border-white/20"
+              : "bg-white/5 text-slate-400 border-white/10 hover:bg-white/10"
+          }`}
+        >
+          OFF
+        </button>
+        <button
+          onClick={clearAll}
+          disabled={lines.length === 0}
+          className="px-2.5 py-1 rounded-lg border bg-white/5 text-rose-400 border-rose-500/20 hover:bg-rose-500/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          전체 지우기 ({lines.filter((l) => l.kind !== "hline").length + priceLinesRef.current.size})
+        </button>
+        {drawingMode === "trendline" && (
+          <span className="text-slate-500 ml-1">
+            {pendingPoint ? "두 번째 점을 클릭하세요" : "첫 번째 점을 클릭하세요"}
+          </span>
+        )}
+        {drawingMode === "hline" && <span className="text-slate-500 ml-1">차트를 클릭하면 수평선이 생성됩니다</span>}
+      </div>
+
+      {/* 차트 + 툴팁 + SVG 오버레이 컨테이너 */}
       <div className="relative">
         <div
           ref={chartContainerRef}
           className="w-full rounded-xl overflow-hidden"
-          style={{ minHeight: 360 }}
+          style={{ minHeight: CHART_HEIGHT }}
         />
 
-        {/* hover 툴팁 — DOM 직접 조작으로 렌더링 성능 최적화 */}
+        {/* SVG 오버레이 — 추세선 렌더 + 클릭 캡처 */}
+        <svg
+          ref={svgRef}
+          onClick={handleChartClick}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: svgInteractive ? "auto" : "none",
+            cursor: svgInteractive ? "crosshair" : "default",
+            zIndex: 5,
+          }}
+        >
+          {trendlineSegments.map((s) => (
+            <line
+              key={s.id}
+              x1={s.x1}
+              y1={s.y1}
+              x2={s.x2}
+              y2={s.y2}
+              stroke="#a855f7"
+              strokeWidth={1.5}
+              strokeDasharray="0"
+            />
+          ))}
+          {pendingPoint && (
+            <circle cx={pendingPoint.x} cy={pendingPoint.y} r={4} fill="#a855f7" />
+          )}
+        </svg>
+
+        {/* hover 툴팁 */}
         <div
           ref={tooltipRef}
           style={{

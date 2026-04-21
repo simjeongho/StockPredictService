@@ -106,8 +106,8 @@ export default function HistoryPage() {
           <p className="text-slate-600 text-xs mt-1">종목 상세 페이지에서 AI 분석을 요청하면 기록이 저장됩니다.</p>
         </div>
       ) : (
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-white/10">
                 <th className="text-left px-6 py-3.5 text-slate-500 font-medium">종목</th>
@@ -121,7 +121,11 @@ export default function HistoryPage() {
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                <tr
+                  key={item.id}
+                  onClick={() => openDetail(item.id)}
+                  className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+                >
                   <td className="px-6 py-4">
                     <div>
                       <span className="font-semibold text-slate-50">
@@ -147,7 +151,7 @@ export default function HistoryPage() {
                   </td>
                   <td className="px-4 py-4">
                     <button
-                      onClick={() => openDetail(item.id)}
+                      onClick={(e) => { e.stopPropagation(); openDetail(item.id); }}
                       className="px-3 py-1.5 rounded-lg text-xs text-slate-400 border border-white/10 hover:bg-white/10 hover:text-slate-300 transition-all"
                     >
                       자세히
