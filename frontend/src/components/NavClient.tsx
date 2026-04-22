@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 const PUBLIC_NAV_LINKS = [
   { href: "/dashboard", label: "대시보드" },
@@ -22,6 +23,11 @@ export default function NavClient() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const allLinks = [
     ...PUBLIC_NAV_LINKS,
@@ -103,12 +109,15 @@ export default function NavClient() {
         )}
       </button>
 
-      {/* 모바일 드로어 오버레이 */}
-      {mobileOpen && (
+      {/* 모바일 드로어 오버레이 — document.body 포털 렌더 (헤더 backdrop-blur 격리 회피) */}
+      {mounted && mobileOpen && createPortal(
         <div
-          className="sm:hidden fixed inset-0 top-16 z-40 bg-slate-950 border-t border-white/10 before:absolute before:inset-x-0 before:top-0 before:h-12 before:bg-gradient-to-b before:from-purple-500/10 before:to-transparent before:pointer-events-none"
+          className="sm:hidden fixed inset-0 z-[100]"
+          style={{ backgroundColor: "#0B1220" }}
           onClick={() => setMobileOpen(false)}
         >
+          {/* 상단 헤더 영역 자리맞춤용 스페이서 */}
+          <div className="h-14 border-b border-white/10" />
           <nav
             className="flex flex-col p-4 gap-1"
             onClick={(e) => e.stopPropagation()}
@@ -119,10 +128,11 @@ export default function NavClient() {
                 <Link
                   key={href}
                   href={href}
-                  className={`px-4 py-3 rounded-xl text-base font-medium transition-colors ${
+                  onClick={() => setMobileOpen(false)}
+                  className={`px-4 py-3.5 rounded-xl text-base font-semibold transition-colors ${
                     active
-                      ? "text-white bg-white/10"
-                      : "text-slate-300 hover:text-white hover:bg-white/5"
+                      ? "text-white bg-purple-500/20 border border-purple-500/30"
+                      : "text-slate-100 hover:text-white hover:bg-white/10 border border-transparent"
                   }`}
                 >
                   {label}
@@ -131,20 +141,24 @@ export default function NavClient() {
             })}
             {session && (
               <>
-                <div className="h-px bg-white/10 my-2" />
-                <div className="px-4 py-2 text-xs text-slate-500 truncate">
+                <div className="h-px bg-white/15 my-3" />
+                <div className="px-4 py-2 text-xs text-slate-400 truncate">
                   {session.user?.name ?? session.user?.email}
                 </div>
                 <button
-                  onClick={() => signOut({ callbackUrl: "/login" })}
-                  className="px-4 py-3 rounded-xl text-base font-medium text-slate-300 hover:text-white hover:bg-white/5 text-left"
+                  onClick={() => {
+                    setMobileOpen(false);
+                    signOut({ callbackUrl: "/login" });
+                  }}
+                  className="px-4 py-3.5 rounded-xl text-base font-semibold text-slate-100 hover:text-white hover:bg-white/10 text-left border border-transparent hover:border-white/10"
                 >
                   로그아웃
                 </button>
               </>
             )}
           </nav>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

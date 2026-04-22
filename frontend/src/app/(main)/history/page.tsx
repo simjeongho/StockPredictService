@@ -116,7 +116,6 @@ export default function HistoryPage() {
                 <th className="text-left px-4 py-3.5 text-slate-500 font-medium">중기</th>
                 <th className="text-left px-4 py-3.5 text-slate-500 font-medium">장기</th>
                 <th className="text-right px-6 py-3.5 text-slate-500 font-medium">날짜</th>
-                <th className="px-4 py-3.5"></th>
               </tr>
             </thead>
             <tbody>
@@ -148,14 +147,6 @@ export default function HistoryPage() {
                   </td>
                   <td className="px-6 py-4 text-right text-slate-500 text-xs">
                     {new Date(item.created_at).toLocaleDateString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  </td>
-                  <td className="px-4 py-4">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); openDetail(item.id); }}
-                      className="px-3 py-1.5 rounded-lg text-xs text-slate-400 border border-white/10 hover:bg-white/10 hover:text-slate-300 transition-all"
-                    >
-                      자세히
-                    </button>
                   </td>
                 </tr>
               ))}
