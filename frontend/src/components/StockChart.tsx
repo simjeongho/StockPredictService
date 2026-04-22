@@ -162,6 +162,7 @@ export default function StockChart({ candles, ticker, market = "us", candleType 
   const [pendingPoint, setPendingPoint] = useState<{ time: string; price: number; x: number; y: number } | null>(null);
   const [lines, setLines] = useState<DrawingLine[]>(() => loadLines(ticker, market));
   const [renderTick, setRenderTick] = useState(0);
+  const [hoverTooltip, setHoverTooltip] = useState<{ x: number; y: number; price: number } | null>(null);
 
   const displayCandles = useMemo(() => aggregateCandles(candles, candleType), [candles, candleType]);
 
@@ -423,6 +424,84 @@ export default function StockChart({ candles, ticker, market = "us", candleType 
     }
   }, [lines, renderTick]);
 
+  // 그린 선(추세선·수평선) 위 hover/터치 시 가격 툴팁
+  useEffect(() => {
+    const container = chartContainerRef.current;
+    if (!container) return;
+
+    const HITBOX_PX = 8;
+
+    const computeHit = (x: number, y: number): { x: number; y: number; price: number } | null => {
+      const cs = candleSeriesRef.current;
+      if (!cs) return null;
+
+      // 추세선: 픽셀 선형 보간
+      for (const l of lines) {
+        if (l.kind !== "trendline") continue;
+        const chart = chartRef.current;
+        if (!chart) continue;
+        const x1 = chart.timeScale().timeToCoordinate(l.p1.time as `${number}-${number}-${number}`);
+        const x2 = chart.timeScale().timeToCoordinate(l.p2.time as `${number}-${number}-${number}`);
+        const y1 = cs.priceToCoordinate(l.p1.price);
+        const y2 = cs.priceToCoordinate(l.p2.price);
+        if (x1 == null || x2 == null || y1 == null || y2 == null) continue;
+        if (Math.abs(x2 - x1) < 1) continue;
+        const xMin = Math.min(x1, x2);
+        const xMax = Math.max(x1, x2);
+        if (x < xMin - HITBOX_PX || x > xMax + HITBOX_PX) continue;
+        const clampedX = Math.max(Math.min(x, xMax), xMin);
+        const t = (clampedX - x1) / (x2 - x1);
+        const yAtX = y1 + t * (y2 - y1);
+        if (Math.abs(y - yAtX) > HITBOX_PX) continue;
+        const price = cs.coordinateToPrice(yAtX);
+        if (price == null) continue;
+        return { x: clampedX, y: yAtX, price: Number(price) };
+      }
+
+      // 수평선: 고정 가격, y좌표는 priceToCoordinate
+      for (const l of lines) {
+        if (l.kind !== "hline") continue;
+        const yLine = cs.priceToCoordinate(l.price);
+        if (yLine == null) continue;
+        if (Math.abs(y - yLine) > HITBOX_PX) continue;
+        return { x, y: yLine, price: l.price };
+      }
+
+      return null;
+    };
+
+    const handleMove = (clientX: number, clientY: number) => {
+      const rect = container.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
+        setHoverTooltip(null);
+        return;
+      }
+      setHoverTooltip(computeHit(x, y));
+    };
+
+    const onMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY);
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 0) return;
+      handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    };
+    const onTouchEnd = () => setHoverTooltip(null);
+    const onMouseLeave = () => setHoverTooltip(null);
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchend", onTouchEnd);
+    container.addEventListener("mouseleave", onMouseLeave);
+
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      container.removeEventListener("mouseleave", onMouseLeave);
+    };
+  }, [lines, renderTick]);
+
   // 추세선 → SVG 좌표 변환
   const trendlineSegments = useMemo(() => {
     const chart = chartRef.current;
@@ -614,6 +693,22 @@ export default function StockChart({ candles, ticker, market = "us", candleType 
             color: "#e2e8f0",
           }}
         />
+
+        {/* 그린 선 위 가격 툴팁 (US-5) */}
+        {hoverTooltip && (
+          <div
+            className="absolute pointer-events-none px-2 py-1 rounded-md bg-slate-900/95 border border-purple-500/40 text-xs font-semibold text-purple-200 shadow-lg shadow-purple-500/20"
+            style={{
+              left: Math.max(4, Math.min(hoverTooltip.x + 10, (chartContainerRef.current?.clientWidth ?? 1000) - 80)),
+              top: Math.max(4, hoverTooltip.y - 28),
+              zIndex: 15,
+            }}
+          >
+            {market === "kr"
+              ? `₩${hoverTooltip.price.toLocaleString("ko-KR", { maximumFractionDigits: 0 })}`
+              : `$${hoverTooltip.price.toFixed(2)}`}
+          </div>
+        )}
       </div>
 
       {/* 범례 */}

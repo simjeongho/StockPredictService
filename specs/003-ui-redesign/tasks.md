@@ -43,8 +43,8 @@ description: "Task list — 003-ui-redesign 모바일 UI 세부 개선"
 
 ### Implementation for User Story 1
 
-- [ ] T002 [US1] `frontend/src/components/NavClient.tsx` 모바일 드로어 루트 `<div>`의 클래스에서 `bg-slate-950/95 backdrop-blur-md`를 `bg-slate-950`로 교체하고 상단 내부에 `before:absolute before:inset-x-0 before:top-0 before:h-12 before:bg-gradient-to-b before:from-purple-500/10 before:to-transparent before:pointer-events-none` 의사 엘리먼트 추가
-- [ ] T003 [US1] `frontend/src/components/NavClient.tsx` 드로어 오픈 상태에서 기존 `document.body.style.overflow = "hidden"` / pathname 변경 시 자동 닫힘 로직이 회귀 없이 유지되는지 코드상 확인 (변경 없으면 체크만)
+- [X] T002 [US1] `frontend/src/components/NavClient.tsx` 모바일 드로어 루트 `<div>`의 클래스에서 `bg-slate-950/95 backdrop-blur-md`를 `bg-slate-950`로 교체하고 상단 내부에 `before:content-[''] before:absolute before:inset-x-0 before:top-0 before:h-12 before:bg-gradient-to-b before:from-purple-500/10 before:to-transparent before:pointer-events-none` 의사 엘리먼트 추가
+- [X] T003 [US1] `frontend/src/components/NavClient.tsx` 드로어 오픈 상태에서 기존 `document.body.classList.add("overflow-hidden")` / pathname 변경 시 자동 닫힘 로직이 회귀 없이 유지되는지 코드상 확인 (변경 없음 — 기존 useEffect 그대로)
 
 **Checkpoint**: iPhone SE/Galaxy S25 Edge 뷰포트에서 드로어 열었을 때 뒤 배경 완전 차단, 브랜드 보라 엣지 은은하게 보임, 배경 스크롤 잠금 유지.
 
@@ -58,10 +58,10 @@ description: "Task list — 003-ui-redesign 모바일 UI 세부 개선"
 
 ### Implementation for User Story 2
 
-- [ ] T004 [US2] `frontend/src/components/ScoreGauge.tsx` ArcGauge 3개를 감싸는 컨테이너 `flex justify-around px-4 py-6 bg-white/[0.02]`를 `grid grid-cols-3 place-items-center gap-0 px-2 sm:px-4 py-6 bg-white/[0.02]`로 교체하고, 기존 `<div className="w-px bg-white/5" />` 세로 구분선 엘리먼트 2개를 제거
-- [ ] T005 [US2] `frontend/src/components/ScoreGauge.tsx` 각 ArcGauge 래퍼에 `w-full border-r last:border-r-0 border-white/5 flex items-center justify-center` 추가하여 구분선 시각 복원
-- [ ] T006 [US2] `frontend/src/components/ScoreGauge.tsx` ArcGauge 내부 SVG 컨테이너를 `w-24 h-24 sm:w-28 sm:h-28`로, 라벨 텍스트를 `text-[11px] sm:text-xs`로 반응형 분기
-- [ ] T007 [US2] `frontend/src/app/(main)/stock/[ticker]/page.tsx` ScoreGauge를 감싸는 섹션 래퍼가 모바일에서 `w-full`을 유지하는지 확인하고, 불필요한 `max-w-*` 고정 폭이 있으면 제거
+- [X] T004 [US2] `frontend/src/components/ScoreGauge.tsx` ArcGauge 3개를 감싸는 컨테이너 `flex justify-around px-4 py-6 bg-white/[0.02]`를 `grid grid-cols-3 px-2 sm:px-4 py-6 bg-white/[0.02]`로 교체하고, 기존 `<div className="w-px bg-white/5" />` 세로 구분선 엘리먼트 2개를 제거
+- [X] T005 [US2] `frontend/src/components/ScoreGauge.tsx` 각 ArcGauge 래퍼에 `flex items-center justify-center border-r border-white/5` 추가 (마지막 셀은 border-r 생략) 하여 구분선 시각 복원
+- [X] T006 [US2] `frontend/src/components/ScoreGauge.tsx` ArcGauge 내부 SVG 컨테이너를 `w-24 h-24 sm:w-28 sm:h-28` + viewBox 스케일링으로, 라벨 텍스트를 `text-[10px] sm:text-xs` / 점수 `text-xl sm:text-2xl` / 라벨 뱃지 `text-[11px] sm:text-xs`로 반응형 분기
+- [X] T007 [US2] `frontend/src/app/(main)/stock/[ticker]/page.tsx` ScoreGauge 섹션 래퍼 확인 — 기존 래퍼가 이미 `w-full` 유지, 고정 `max-w-*` 없음 (변경 없음)
 
 **Checkpoint**: 360/375/412px 뷰포트에서 게이지 3개가 완전 중앙 대칭(좌우 여백 차이 ≤ 8px), 라벨 줄바꿈 없음, 데스크톱 1280px에서는 기존 구분선·크기 그대로.
 
@@ -75,8 +75,8 @@ description: "Task list — 003-ui-redesign 모바일 UI 세부 개선"
 
 ### Implementation for User Story 3
 
-- [ ] T008 [P] [US3] `frontend/src/app/(main)/history/page.tsx`의 `TypeBadge` 컴포넌트 루트 `<span>`의 className에 `whitespace-nowrap inline-flex items-center` 추가
-- [ ] T009 [P] [US3] `frontend/src/app/(main)/history/page.tsx`의 `ScoreBadge` 컴포넌트 루트 `<span>`의 className에 `whitespace-nowrap inline-flex items-center` 추가
+- [X] T008 [P] [US3] `frontend/src/app/(main)/history/page.tsx`의 `TypeBadge` 컴포넌트 루트 `<span>`의 className에 `whitespace-nowrap inline-flex items-center` 추가
+- [X] T009 [P] [US3] `frontend/src/app/(main)/history/page.tsx`의 `ScoreBadge` 컴포넌트 루트 `<span>`의 className에 `whitespace-nowrap inline-flex items-center` 추가
 
 **Checkpoint**: 360px~1920px 전 구간에서 뱃지 줄바꿈 0건.
 
@@ -90,9 +90,9 @@ description: "Task list — 003-ui-redesign 모바일 UI 세부 개선"
 
 ### Implementation for User Story 4
 
-- [ ] T010 [US4] `frontend/src/components/ScoreTable.tsx`의 `SORT_TABS` 배열 각 항목에 `shortLabel` 필드 추가: 단기/중기/장기/종합 (기존 label은 그대로 유지)
-- [ ] T011 [US4] `frontend/src/components/ScoreTable.tsx` 토글 컨테이너 래퍼 `<div>`의 className을 `flex gap-1 overflow-x-auto`에서 `grid grid-cols-4 gap-1.5 sm:flex sm:gap-2 sm:overflow-visible`로 교체
-- [ ] T012 [US4] `frontend/src/components/ScoreTable.tsx` 각 토글 `<button>`의 className을 `px-2 py-2 sm:px-4 sm:py-1.5 text-xs sm:text-sm` 기반으로 조정하여 모바일 터치 타겟 ≥ 36px 보장, 버튼 내부 텍스트를 `<span className="sm:hidden">{tab.shortLabel}</span><span className="hidden sm:inline">{tab.label}</span>` 구조로 분기
+- [X] T010 [US4] `frontend/src/components/ScoreTable.tsx`의 `SORT_TABS` 배열 각 항목에 `shortLabel` 필드 추가: 단기/중기/장기/종합 (기존 label은 그대로 유지)
+- [X] T011 [US4] `frontend/src/components/ScoreTable.tsx` 토글 컨테이너 래퍼 `<div>`의 className을 `grid grid-cols-4 gap-1.5 sm:flex sm:gap-2 sm:overflow-visible`로 교체
+- [X] T012 [US4] `frontend/src/components/ScoreTable.tsx` 각 토글 `<button>`의 className을 `px-2 py-2 sm:px-4 sm:py-1.5 text-xs sm:text-sm` 기반으로 조정, 버튼 내부 텍스트를 `<span className="sm:hidden">{tab.shortLabel}</span><span className="hidden sm:inline">{tab.label}</span>` 구조로 분기
 
 **Checkpoint**: 360px에서 4개 토글 한 행 + 가로 스크롤 없음, 데스크톱 1280px에서 기존 UX 회귀 없음.
 
@@ -106,13 +106,13 @@ description: "Task list — 003-ui-redesign 모바일 UI 세부 개선"
 
 ### Implementation for User Story 5
 
-- [ ] T013 [US5] `frontend/src/components/StockChart.tsx`에 `hoverTooltip` 상태 추가: `useState<{ x: number; y: number; price: number } | null>(null)`
-- [ ] T014 [US5] `frontend/src/components/StockChart.tsx` 추세선 SVG `<line>` 위에 투명 히트박스 `<line>` 한 쌍 렌더: `stroke="transparent" strokeWidth={14} style={{ cursor: "pointer", pointerEvents: "stroke" }}`. 기존 `<line>`는 시각용으로 `pointerEvents: "none"` 설정
-- [ ] T015 [US5] `frontend/src/components/StockChart.tsx`에 `handleLinePointerMove(e, line)` 핸들러 구현: SVG 로컬 좌표 추출 → 추세선 `(x1,y1)-(x2,y2)` 픽셀 보간으로 커서 y 산출 → `candleSeriesRef.current.coordinateToPrice(y)`로 달러 환산 → `setHoverTooltip({ x: cursorX, y: cursorY, price })`
-- [ ] T016 [US5] `frontend/src/components/StockChart.tsx` 수평선도 동일 히트박스 `<line>` 레이어 렌더(시각용 createPriceLine과 별도로 SVG overlay에 얇은 stroke-transparent line 추가), 호버 핸들러는 고정 가격(HLineData.price)을 툴팁에 세팅
-- [ ] T017 [US5] `frontend/src/components/StockChart.tsx`에 툴팁 렌더 `<div>` 추가: `className="absolute pointer-events-none px-2 py-1 rounded bg-slate-900/95 border border-purple-500/40 text-xs text-purple-200"`, `style={{ left: hoverTooltip.x + 8, top: hoverTooltip.y - 28 }}`로 절대 위치 배치, 포맷 `$${price.toFixed(2)}`
-- [ ] T018 [US5] `frontend/src/components/StockChart.tsx` 터치 대응: 같은 히트박스에 `onTouchStart={handleLinePointerMove}` `onTouchMove={handleLinePointerMove}`를 추가하고 `touch.clientX/clientY` → SVG 좌표 변환 로직 포함, `onMouseLeave`/`onTouchEnd`에서 `setHoverTooltip(null)`
-- [ ] T019 [US5] `frontend/src/components/StockChart.tsx` 드로잉 모드 OFF(`drawingMode === "off"`) 상태에서 SVG overlay 루트에 `pointerEvents: svgInteractive ? "auto" : "none"` 기존 로직 유지하되, 히트박스 `<line>` 레벨의 `pointerEvents: "stroke"`는 overlay가 none일 때 자동 비활성화되는지 확인 (CSS 상속). 필요 시 조건부 렌더로 명시적 차단
+- [X] T013 [US5] `frontend/src/components/StockChart.tsx`에 `hoverTooltip` 상태 추가: `useState<{ x: number; y: number; price: number } | null>(null)`
+- [X] T014 [US5] (편차) SVG 히트박스 대신 window-level `mousemove`/`touchmove` 리스너 채택 — SVG `pointer-events: none` 상속으로 자식 히트박스가 OFF 모드에서 이벤트를 받지 못하는 구조적 제약 회피. 효과는 동등 (픽셀 히트박스 ±8px)
+- [X] T015 [US5] `frontend/src/components/StockChart.tsx`에 `computeHit(x, y)` 함수 구현: `chart.timeScale().timeToCoordinate()` + `candleSeries.priceToCoordinate()`로 추세선 엔드포인트 픽셀화 → 선형 보간으로 커서 y 산출 → `candleSeries.coordinateToPrice()`로 가격 환산 → `setHoverTooltip(...)`
+- [X] T016 [US5] 수평선도 동일 `computeHit` 루프에서 처리: `priceToCoordinate(line.price)`로 Y 산출, ±8px 히트 시 고정 `line.price`를 툴팁에 세팅
+- [X] T017 [US5] 툴팁 렌더 `<div>` 추가: `className="absolute pointer-events-none px-2 py-1 rounded-md bg-slate-900/95 border border-purple-500/40 text-xs font-semibold text-purple-200 shadow-lg shadow-purple-500/20"`, 포맷 US=`$price.toFixed(2)` / KR=`₩price.toLocaleString("ko-KR")`
+- [X] T018 [US5] 터치 대응: window `touchmove`(passive) 리스너에서 `touch.clientX/clientY` → 컨테이너 `getBoundingClientRect()` 로컬 좌표 변환, `touchend` + `mouseleave`에서 `setHoverTooltip(null)`
+- [X] T019 [US5] window-level 리스너는 drawingMode 무관 항상 활성 — 단 `computeHit`가 `lines` 배열(그려진 선) 기반이므로 드로잉 OFF + 선 0개 상태에서는 자연히 툴팁 없음. 기존 차트 크로스헤어는 `chartContainerRef` 내부 동작 그대로 유지 (리스너 charging 충돌 없음)
 
 **Checkpoint**: 추세선·수평선 호버/터치 시 100ms 이내 가격 툴팁 노출, 드로잉 OFF 상태에서 봉 크로스헤어 기존 동작 그대로.
 
