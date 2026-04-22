@@ -28,28 +28,29 @@ export default function ScoreTable({ items, sortBy, onSortChange }: ScoreTablePr
   const router = useRouter();
   const [expandedTicker, setExpandedTicker] = useState<string | null>(null);
 
-  const SORT_TABS: { key: "short" | "mid" | "long" | "total"; label: string }[] = [
-    { key: "short", label: "단기 (1주)" },
-    { key: "mid", label: "중기 (3개월)" },
-    { key: "long", label: "장기 (1년)" },
-    { key: "total", label: "종합" },
+  const SORT_TABS: { key: "short" | "mid" | "long" | "total"; label: string; shortLabel: string }[] = [
+    { key: "short", label: "단기 (1주)", shortLabel: "단기" },
+    { key: "mid", label: "중기 (3개월)", shortLabel: "중기" },
+    { key: "long", label: "장기 (1년)", shortLabel: "장기" },
+    { key: "total", label: "종합", shortLabel: "종합" },
   ];
 
   return (
     <div className="space-y-3">
       {/* 정렬 탭 */}
-      <div className="flex gap-1 overflow-x-auto">
+      <div className="grid grid-cols-4 gap-1.5 sm:flex sm:gap-2 sm:overflow-visible">
         {SORT_TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => onSortChange(tab.key)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+            className={`px-2 py-2 sm:px-4 sm:py-1.5 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-colors ${
               sortBy === tab.key
                 ? "bg-gradient-to-r from-purple-600 to-blue-500 text-white shadow-md shadow-purple-500/20"
                 : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-300"
             }`}
           >
-            {tab.label}
+            <span className="sm:hidden">{tab.shortLabel}</span>
+            <span className="hidden sm:inline">{tab.label}</span>
           </button>
         ))}
       </div>

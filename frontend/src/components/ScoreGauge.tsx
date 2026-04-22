@@ -23,9 +23,9 @@ function ArcGauge({
 
   return (
     <div className="flex flex-col items-center gap-2">
-      <p className="text-xs font-medium text-slate-400 tracking-wide">{term}</p>
-      <div className="relative" style={{ width: 116, height: 116 }}>
-        <svg width="116" height="116" viewBox="0 0 116 116" className="-rotate-90">
+      <p className="text-[10px] sm:text-xs font-medium text-slate-400 tracking-wide whitespace-nowrap">{term}</p>
+      <div className="relative w-24 h-24 sm:w-28 sm:h-28">
+        <svg width="100%" height="100%" viewBox="0 0 116 116" className="-rotate-90">
           {/* 배경 트랙 */}
           <circle
             cx="58" cy="58" r={r}
@@ -49,14 +49,14 @@ function ArcGauge({
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold tabular-nums" style={{ color }}>
+          <span className="text-xl sm:text-2xl font-bold tabular-nums" style={{ color }}>
             {score}
           </span>
           <span className="text-[10px] text-slate-600 font-medium">/ 100</span>
         </div>
       </div>
       <span
-        className="text-xs font-semibold px-3 py-1 rounded-full border"
+        className="text-[11px] sm:text-xs font-semibold px-2 sm:px-3 py-1 rounded-full border whitespace-nowrap"
         style={{
           borderColor: `${color}40`,
           backgroundColor: `${color}18`,
@@ -106,12 +106,16 @@ export default function ScoreGauge({ score }: ScoreGaugeProps) {
       </div>
 
       {/* 기간별 게이지 */}
-      <div className="flex justify-around px-4 py-6 bg-white/[0.02]">
-        <ArcGauge term="단기 (1주)" score={score.short_term.score} label={score.short_term.label} />
-        <div className="w-px bg-white/5" />
-        <ArcGauge term="중기 (3개월)" score={score.mid_term.score} label={score.mid_term.label} />
-        <div className="w-px bg-white/5" />
-        <ArcGauge term="장기 (1년)" score={score.long_term.score} label={score.long_term.label} />
+      <div className="grid grid-cols-3 px-2 sm:px-4 py-6 bg-white/[0.02]">
+        <div className="flex items-center justify-center border-r border-white/5">
+          <ArcGauge term="단기 (1주)" score={score.short_term.score} label={score.short_term.label} />
+        </div>
+        <div className="flex items-center justify-center border-r border-white/5">
+          <ArcGauge term="중기 (3개월)" score={score.mid_term.score} label={score.mid_term.label} />
+        </div>
+        <div className="flex items-center justify-center">
+          <ArcGauge term="장기 (1년)" score={score.long_term.score} label={score.long_term.label} />
+        </div>
       </div>
 
       {/* 점수 기준 범례 */}
