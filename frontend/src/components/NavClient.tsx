@@ -106,7 +106,7 @@ export default function NavClient() {
       {/* 모바일 드로어 오버레이 */}
       {mobileOpen && (
         <div
-          className="sm:hidden fixed inset-0 top-16 z-40 bg-slate-950/95 backdrop-blur-md border-t border-white/10"
+          className="sm:hidden fixed inset-0 top-16 z-40 bg-slate-950 border-t border-white/10 before:absolute before:inset-x-0 before:top-0 before:h-12 before:bg-gradient-to-b before:from-purple-500/10 before:to-transparent before:pointer-events-none"
           onClick={() => setMobileOpen(false)}
         >
           <nav
