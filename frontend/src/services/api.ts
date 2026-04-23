@@ -44,16 +44,19 @@ export async function searchStocks(
 
 export async function getPrice(
   ticker: string,
-  period: "1m" | "3m" | "6m" | "1y" | "3y" | "5y" = "1y"
+  period: "1m" | "3m" | "6m" | "1y" | "3y" | "5y" = "1y",
+  market: "us" | "kr" = "us"
 ): Promise<PriceResponse> {
   const { data } = await api.get(`/api/v1/stocks/${ticker}/price`, {
-    params: { period },
+    params: { period, market },
   });
   return data;
 }
 
-export async function getIndicators(ticker: string): Promise<IndicatorsData> {
-  const { data } = await api.get(`/api/v1/stocks/${ticker}/indicators`);
+export async function getIndicators(ticker: string, market: "us" | "kr" = "us"): Promise<IndicatorsData> {
+  const { data } = await api.get(`/api/v1/stocks/${ticker}/indicators`, {
+    params: { market },
+  });
   return data;
 }
 

@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update
+from app.models.stock import Stock
 
 from app.database import get_db
 from app.models.user import User
@@ -121,6 +122,55 @@ async def reset_usage(
             raise HTTPException(status_code=400, detail="유효하지 않은 user_id 형식입니다.")
     await reset_analysis_usage(db, uid, ticker, market)
     return {"message": f"{ticker.upper()} ({market}) 분석 횟수가 초기화되었습니다."}
+
+
+@router.post("/stocks/refresh")
+async def refresh_stocks(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """KOSPI+KOSDAQ 종목 마스터를 pykrx로 수집해 DB 갱신. 관리자 전용."""
+    require_admin(current_user)
+    from app.services.stocks_master import refresh_kr_stocks
+    try:
+        result = await refresh_kr_stocks(db)
+        return result
+    except Exception as e:
+        logger.error("stocks refresh 실패: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "REFRESH_FAILED", "message": str(e)},
+        )
+
+
+@router.get("/stocks/status")
+async def stocks_status(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """stocks 마스터 테이블 상태 요약. 관리자 전용."""
+    require_admin(current_user)
+    total_res = await db.execute(
+        select(func.count()).select_from(Stock).where(Stock.market == "kr")
+    )
+    active_res = await db.execute(
+        select(func.count()).select_from(Stock).where(Stock.market == "kr", Stock.is_active == True)
+    )
+    last_res = await db.execute(
+        select(func.max(Stock.synced_at)).where(Stock.market == "kr")
+    )
+    exch_res = await db.execute(
+        select(Stock.exchange, func.count())
+        .where(Stock.market == "kr", Stock.is_active == True)
+        .group_by(Stock.exchange)
+    )
+    last_synced = last_res.scalar_one()
+    return {
+        "total": total_res.scalar_one(),
+        "active": active_res.scalar_one(),
+        "last_synced_at": last_synced.isoformat() if last_synced else None,
+        "by_exchange": {row[0]: row[1] for row in exch_res.all()},
+    }
 
 
 @router.post("/users/{user_id}/unban")

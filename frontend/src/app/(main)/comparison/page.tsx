@@ -47,7 +47,7 @@ export default function ComparisonPage() {
     setSaveStatus("idle");
 
     // 차트 데이터 로드
-    const priceResults = await Promise.allSettled(tickers.map((t) => getPrice(t, "1m")));
+    const priceResults = await Promise.allSettled(tickers.map((t) => getPrice(t, "1m", market)));
     const newPriceMap: Record<string, PriceResponse> = {};
     priceResults.forEach((r, i) => {
       if (r.status === "fulfilled") newPriceMap[tickers[i]] = r.value;
@@ -131,7 +131,7 @@ export default function ComparisonPage() {
                 type="text"
                 value={t}
                 onChange={(e) => updateTicker(i, e.target.value)}
-                placeholder={`종목 ${i + 1} (예: AAPL)`}
+                placeholder={`종목 ${i + 1} (예: ${market === "kr" ? "005930" : "AAPL"})`}
                 className="bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-purple-500/50 text-sm w-36"
               />
               {tickerInputs.length > 2 && (

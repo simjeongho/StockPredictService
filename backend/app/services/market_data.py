@@ -1,10 +1,12 @@
 """yfinance(미국) + FinanceDataReader(한국) 통합 시장 데이터 서비스."""
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 import pandas as pd
 import yfinance as yf
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +51,7 @@ def _market_status(ticker_obj: yf.Ticker) -> Literal["open", "closed", "holiday"
         return "closed"
 
 
-async def search_stock(q: str, market: str | None = None) -> list[dict]:
+async def search_stock(q: str, market: str | None = None, db: AsyncSession | None = None) -> list[dict]:
     """종목명·티커로 검색. 동명 종목의 경우 거래소명을 함께 반환한다."""
     results = []
     try:
@@ -73,43 +75,60 @@ async def search_stock(q: str, market: str | None = None) -> list[dict]:
     except Exception as e:
         logger.warning("yfinance 검색 오류: %s", e)
 
-    # 한국 주식 (FinanceDataReader)
+    # 한국 주식 — fdr.StockListing('KRX')가 KRX 서버 변경으로 파싱 실패하므로 우회
     if not market or market == "kr":
         try:
             import FinanceDataReader as fdr
 
-            kr_list = fdr.StockListing("KRX")
-            matched = kr_list[
-                kr_list["Name"].str.contains(q, na=False)
-                | kr_list["Code"].str.upper().str.contains(q.upper(), na=False)
-            ].head(5)
-            for _, row in matched.iterrows():
-                ticker_code = str(row["Code"])
+            recent_date = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+
+            if re.fullmatch(r"\d{6}", q.strip()):
+                # 6자리 숫자 코드 직접 조회
+                codes_to_fetch = [(q.strip(), None)]
+            else:
+                # 텍스트 검색: DB stocks 마스터에서 종목명/티커 검색
+                codes_to_fetch = []
+                if db is not None:
+                    from app.services.stocks_master import search_kr_by_name
+                    pairs = await search_kr_by_name(db, q, limit=5)
+                    codes_to_fetch = [(ticker, name) for ticker, name in pairs]
+
+            for code, name_hint in codes_to_fetch:
                 try:
-                    df = fdr.DataReader(ticker_code, "2024-01-01")
-                    if not df.empty:
-                        last = df.iloc[-1]
-                        results.append(
-                            {
-                                "ticker": ticker_code,
-                                "name": row["Name"],
-                                "market": "kr",
-                                "exchange": "KRX",
-                                "current_price": float(last["Close"]),
-                                "change_pct": float(
-                                    (last["Close"] - last["Open"]) / last["Open"] * 100
-                                    if last["Open"]
-                                    else 0
-                                ),
-                                "volume": int(last["Volume"]),
-                                "market_cap": 0,
-                                "currency": "KRW",
-                            }
-                        )
+                    df = fdr.DataReader(code, recent_date)
+                    if df.empty:
+                        continue
+                    last = df.iloc[-1]
+                    prev = df.iloc[-2] if len(df) > 1 else last
+                    change_pct = (
+                        (float(last["Close"]) - float(prev["Close"])) / float(prev["Close"]) * 100
+                        if float(prev["Close"]) else 0.0
+                    )
+                    # 종목명: pykrx가 제공하면 사용, 아니면 코드로 대체
+                    display_name = name_hint
+                    if not display_name:
+                        try:
+                            from pykrx import stock as pykrx_stock
+                            display_name = pykrx_stock.get_market_ticker_name(code)
+                        except Exception:
+                            display_name = code
+                    results.append(
+                        {
+                            "ticker": code,
+                            "name": display_name or code,
+                            "market": "kr",
+                            "exchange": "KRX",
+                            "current_price": float(last["Close"]),
+                            "change_pct": change_pct,
+                            "volume": int(last["Volume"]),
+                            "market_cap": 0,
+                            "currency": "KRW",
+                        }
+                    )
                 except Exception:
                     pass
         except Exception as e:
-            logger.warning("FinanceDataReader 검색 오류: %s", e)
+            logger.warning("한국 주식 검색 오류: %s", e)
 
     return results
 

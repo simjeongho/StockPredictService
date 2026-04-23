@@ -32,12 +32,13 @@ logger = logging.getLogger(__name__)
 async def search_stocks(
     q: str = Query(..., min_length=1, description="종목명 또는 티커"),
     market: Literal["us", "kr"] | None = Query(None),
+    db: AsyncSession = Depends(get_db),
 ):
     """종목명·티커로 검색. 동명 종목의 거래소명 포함."""
     if not q.strip():
         raise HTTPException(status_code=400, detail="검색어를 입력해 주세요.")
     try:
-        results = await market_data.search_stock(q.strip(), market)
+        results = await market_data.search_stock(q.strip(), market, db=db)
         if not results:
             return []
         return [StockSearchResult(**r) for r in results]
