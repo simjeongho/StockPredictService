@@ -6,6 +6,7 @@ from app.models.analysis_usage import AnalysisUsage
 from app.models.daily_usage import DailyUsage
 from app.models.analysis_history import AnalysisHistory
 from app.models.market_issues_cache import MarketIssuesCache
+from app.models.stock import Stock
 
 __all__ = [
     "User",
@@ -16,4 +17,5 @@ __all__ = [
     "DailyUsage",
     "AnalysisHistory",
     "MarketIssuesCache",
+    "Stock",
 ]
