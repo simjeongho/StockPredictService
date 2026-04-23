@@ -49,6 +49,14 @@ function getComparisonTitle(item: HistoryItem): string {
   return item.ticker;
 }
 
+const MARKET_TABS = [
+  { key: "all", label: "전체" },
+  { key: "kr", label: "한국" },
+  { key: "us", label: "미국" },
+] as const;
+
+type MarketFilter = "all" | "kr" | "us";
+
 export default function HistoryPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -56,6 +64,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<HistoryDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [marketFilter, setMarketFilter] = useState<MarketFilter>("all");
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -93,6 +102,8 @@ export default function HistoryPage() {
     );
   }
 
+  const filteredItems = marketFilter === "all" ? items : items.filter((item) => item.market === marketFilter);
+
   return (
     <div className="space-y-6">
       <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
@@ -100,7 +111,24 @@ export default function HistoryPage() {
         <p className="text-slate-400 text-sm mt-1">나의 AI 분석 기록을 확인하세요</p>
       </div>
 
-      {items.length === 0 ? (
+      {/* 시장 필터 탭 */}
+      <div className="flex gap-2">
+        {MARKET_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setMarketFilter(tab.key)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              marketFilter === tab.key
+                ? "bg-gradient-to-r from-purple-600 to-blue-500 text-white shadow-md shadow-purple-500/20"
+                : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-300"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {filteredItems.length === 0 ? (
         <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-10 text-center">
           <p className="text-slate-500 text-sm">분석 기록이 없습니다.</p>
           <p className="text-slate-600 text-xs mt-1">종목 상세 페이지에서 AI 분석을 요청하면 기록이 저장됩니다.</p>
@@ -119,7 +147,7 @@ export default function HistoryPage() {
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {filteredItems.map((item) => (
                 <tr
                   key={item.id}
                   onClick={() => openDetail(item.id)}

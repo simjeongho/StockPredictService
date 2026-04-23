@@ -57,8 +57,8 @@ export default function StockDetailPage() {
     setLoadingPrice(true);
     try {
       const [price, ind] = await Promise.all([
-        getPrice(ticker, period),
-        getIndicators(ticker),
+        getPrice(ticker, period, market),
+        getIndicators(ticker, market),
       ]);
       setPriceData(price);
       setIndicators(ind);

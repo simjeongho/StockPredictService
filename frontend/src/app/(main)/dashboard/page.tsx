@@ -41,6 +41,7 @@ export default function DashboardPage() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [scoreMap, setScoreMap] = useState<Record<string, ScoreRankingItem>>({});
   const [loading, setLoading] = useState(true);
+  const [marketFilter, setMarketFilter] = useState<"all" | "kr" | "us">("all");
 
   const token = (session as { accessToken?: string })?.accessToken ?? "";
 
@@ -116,6 +117,25 @@ export default function DashboardPage() {
         </Link>
       </div>
 
+      {/* 시장 필터 탭 */}
+      {watchlist.length > 0 && (
+        <div className="flex gap-2">
+          {(["all", "kr", "us"] as const).map((key) => (
+            <button
+              key={key}
+              onClick={() => setMarketFilter(key)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                marketFilter === key
+                  ? "bg-gradient-to-r from-purple-600 to-blue-500 text-white shadow-md shadow-purple-500/20"
+                  : "bg-white/5 text-slate-400 hover:bg-white/10 hover:text-slate-300"
+              }`}
+            >
+              {key === "all" ? "전체" : key === "kr" ? "한국" : "미국"}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* 카드 그리드 */}
       {watchlist.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -137,7 +157,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {watchlist.map((item) => (
+          {(marketFilter === "all" ? watchlist : watchlist.filter((item) => item.market === marketFilter)).map((item) => (
             <DashboardCard
               key={`${item.ticker}-${item.market}`}
               item={item}
